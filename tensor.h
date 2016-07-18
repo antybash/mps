@@ -19,14 +19,15 @@ template<typename T, std::size_t N>
 using tensor = boost::multi_array<T,N>;
 
 template<std::size_t N, typename T>
-void output_tensor(tensor<T,N> t) {
+void output_tensor(tensor<T,N> t)
+{
     copy(t.origin(),t.origin()+t.num_elements(), std::ostream_iterator<T>(std::cout, " "));
     std::cout << std::endl;
 }
 
 template<typename T, std::size_t N, std::size_t M, std::size_t dA, std::size_t dB>
     tensor<T,N+M-dA-dB> 
-contract(tensor<T,N> A, tensor<T,M> B, std::array<int,dA> barA, std::array<int,dB> barB)
+contract(tensor<T,N> A, tensor<T,M> B, std::array<int,dA> barA, std::array<int,dB> barB, bool conjA=false, bool conjB=false)
 {
 
     assert(barA.size() == barB.size());
@@ -45,18 +46,22 @@ contract(tensor<T,N> A, tensor<T,M> B, std::array<int,dA> barA, std::array<int,d
 
     do {
         do {
-
             T sum = 0;
-
             do {
 
-                sum += A(indA)*B(indB);
+                if (conjA && conjB)
+                    sum += std::conj(A(indA)) * std::conj(B(indB));
+                else if (!conjA && conjB)
+                    sum += A(indA) * std::conj(B(indB));
+                else if (conjA && !conjB)
+                    sum += std::conj(A(indA)) * B(indB);
+                else
+                    sum += A(indA) * B(indB);
                 
                 increment_index_with_selection(indA, vecA, barA);
                 increment_index_with_selection(indB, vecB, barB);
 
             }while(!check_all_zeros_with_selection(indA,barA));
-
 
             // set value of C
             combine(indC, indA, indB, barA, barB);

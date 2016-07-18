@@ -103,4 +103,15 @@
 
     - Next goal: J14 #2 -- restructure < psi | psi >
 
+--------------------------------------------------------------------------
+
+## Mon Jul 18 2016
+    
+    - Implemented J14 #2 -- vector of prefix- and suffix- contractions of 
+      < psi | psi > and < psi | H | psi > (all of these are contained in
+      DMRG_contractions.h
+    - Also implemented an update procedure to the prefix/suffix vector for
+      use in the DMRG sweep
+    - I have not tested this part of the implementation
+    - Next goal: implement the individual site optimization
 
