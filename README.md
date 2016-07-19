@@ -113,5 +113,7 @@
     - Also implemented an update procedure to the prefix/suffix vector for
       use in the DMRG sweep
     - I have not tested this part of the implementation
-    - Next goal: implement the individual site optimization
+    - Implemented tensor -> matrix conversion (for eigenvector equation)
+      and eigenvector -> mps_tensor conversion;
+    - Next: DMRG sweep
 
