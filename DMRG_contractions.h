@@ -27,7 +27,7 @@ DMRG_double_left_contract_once (tensor<T,2> A, tensor<T,3> P)
 
 template<typename T>
 std::vector<tensor<T,2> >
-DMRG_double_left_recursive (std::vector<T,3> mpsState)
+DMRG_double_left_recursive (std::vector<tensor<T,3> > mpsState)
 {
     typedef std::vector<int> vi;
     typedef std::complex<double> cd;
@@ -37,7 +37,7 @@ DMRG_double_left_recursive (std::vector<T,3> mpsState)
     vectorLeft[0] = tensor<T,2>(vi({{1,1}}));
     vectorLeft[0](vi({{0,0}})) = 1;
 
-    for (int i = 1; i <= mpsState.size(); ++i){
+    for (int i = 1; i <= mpsState.size(); ++i)
         vectorLeft[i] = DMRG_double_left_contract_once(vectorLeft[i-1],mpsState[i-1]);
     
     return vectorLeft;
@@ -52,8 +52,8 @@ DMRG_double_right_contract_once (tensor<T,3> P, tensor<T,2> A)
     tensor<T,3> T1 = contract(P,A,x,y,false,false);
     // (P0 P1 P2) (A0 A1)    ---> T1 = (P0 P1 A1)
 
-    std::array<int,2> y = {{1,2}};
-    tensor<T,2> T2 = contract(P,T1,y,y,true,false);
+    std::array<int,2> z = {{1,2}};
+    tensor<T,2> T2 = contract(P,T1,z,z,true,false);
     // (P0* P1* P2*) (P0 P1 A1) -> T2 = (P0* P0)
 
     return T2;
@@ -83,7 +83,8 @@ DMRG_double_right_contract_recursive (std::vector<tensor<T,3> > mpsState)
 
 template<typename T>
 void
-DMRG_double_update_site(int new_site, std::vector<tensor<T,3> > &mpsState, std::vector<tensor<T,2> > &vectorLeft, std::vector<tensor<T,2> > &vectorRight)
+DMRG_double_update_site(int new_site, std::vector<tensor<T,3> > &mpsState, 
+        std::vector<tensor<T,2> > &vectorLeft, std::vector<tensor<T,2> > &vectorRight)
 {
     // Suppose mpsState[new_site] has just been updated.
     // This function will update the corresponding vectorLeft and
@@ -139,7 +140,7 @@ DMRG_triple_left_contract_once (tensor<T,3> A, tensor<T,3> P, tensor<T,4> H)
 
 template<typename T>
 std::vector<tensor<T,3> >
-DMRG_triple_left_recursive (std::vector<T,3> mpsState, std::vector<T,4> mpsHamiltonian)
+DMRG_triple_left_recursive (std::vector<tensor<T,3> > mpsState, std::vector<tensor<T,4> > mpsHamiltonian)
 {
     typedef std::vector<int> vi;
     typedef std::complex<double> cd;
@@ -156,7 +157,7 @@ DMRG_triple_left_recursive (std::vector<T,3> mpsState, std::vector<T,4> mpsHamil
 }
 
 template<typename T>
-tensor<T,3> >
+tensor<T,3>
 DMRG_triple_right_contract_once(tensor<T,3> P, tensor<T,4> H, tensor<T,3> A)
 {
     /*
@@ -205,8 +206,8 @@ DMRG_triple_right_contract_recursive (std::vector<tensor<T,3> > mpsState, std::v
 
 template<typename T>
 void
-DMRG_triple_update_site(int new_site, std::vector<tensor<T,3> > &mpsState, std::vector<tensor<T,4> &mpsHamiltonian,
-        std::vector<tensor<T,2> > &vectorLeft, std::vector<tensor<T,2> > &vectorRight)
+DMRG_triple_update_site(int new_site, std::vector<tensor<T,3> > &mpsState, std::vector<tensor<T,4> > &mpsHamiltonian,
+        std::vector<tensor<T,3> > &vectorLeft, std::vector<tensor<T,3> > &vectorRight)
 {
     // Suppose mpsState[new_site] has just been updated.
     // This function will update the corresponding vectorLeft and

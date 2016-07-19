@@ -8,6 +8,7 @@
 #include <complex>
 
 #include "tensor.h"
+#include "DMRG_contractions.h"
 
 bool check1()
 {
