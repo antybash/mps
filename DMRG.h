@@ -9,6 +9,8 @@
 #include <vector>
 #include <array>
 #include <complex>
+#include <functional>
+#include <utility>
 
 tensor<std::complex<double>,2> delta_tensor(int a, int b)
 {
@@ -77,14 +79,55 @@ DMRG_eigenvector_to_mps(Eigen::VectorXcd vec, tensor<std::complex<double>,3> pre
     return T;
 }
 
-/*
 template<typename T>
-void DMRG_mps_site_update (int i, std::vector<tensor<T,3> > &mpsState, std::vector<tensor<T,4> > &mpsHamiltonian,
-                                  std::vector<tensor<T,3> > &tripleVectorLeft, std::vector<tensor<T,3> > &tripleVectorRight
+double DMRG_mps_site_update // THIS IS WRONG!!!
+                          (int i, std::vector<tensor<T,3> > &mpsState,         std::vector<tensor<T,4> > &mpsHamiltonian,
+                                  std::vector<tensor<T,3> > &tripleVectorLeft, std::vector<tensor<T,3> > &tripleVectorRight,
                                   std::vector<tensor<T,3> > &doubleVectorLeft, std::vector<tensor<T,3> > &doubleVectorRight)
 {
+    typedef std::complex<double> cd;
+
+    int L   = mpsState.size();
+    int vli = i;               // index for vectorLeft
+    int vri = L-i-1;           // index for vectorRight
+
+    Eigen::MatrixXcd H = matrixH(tripleVectorLeft[vli], tripleVectorRight[vri], mpsHamiltonian[i]);
+    Eigen::MatrixXcd N = matrixN(doubleVectorLeft[vli], doubleVectorRight[vri], mpsHamiltonian[i]);
+
+    Eigen::GeneralizedSelfAdjointEigenSolver<Eigen::MatrixXcd> es(H,N);
+    double lowest_eigenvalue  = es.eigenvalues()[0];
+    tensor<cd,3> eigenvector  = DMRG_eigenvector_to_mps(es.eigenvectors().col(0), mpsState[i]);
+
+    // update states:
+    mpsState[i] = eigenvector;
+    DMRG_double_update_site(i, mpsState, doubleVectorLeft, doubleVectorRight);
+    DMRG_triple_update_site(i, mpsState, mpsHamiltonian, tripleVectorLeft, tripleVectorRight);
+
+    return lowest_eigenvalue;
 }
-*/
+
+template<typename T>
+void DMRG_sweep (std::vector<tensor<T,3> > &mpsState, std::vector<tensor<T,4> > &mpsHamiltonian)
+{
+    std::vector<tensor<T,2> > double_L = DMRG_double_left_recursive (mpsState);
+    std::vector<tensor<T,2> > double_R = DMRG_double_right_recursive(mpsState);
+    std::vector<tensor<T,3> > triple_L = DMRG_triple_left_recursive (mpsState,mpsHamiltonian);
+    std::vector<tensor<T,3> > triple_R = DMRG_triple_right_recursive(mpsState,mpsHamiltonian);
+
+    int L = mpsState.size();
+    std::vector<double> eigenvalues_history;
+    eigenvalues_history.reserve(2*L+1);
+
+    for(int i = 0; i < L; ++i){
+        eigenvalues_history.push_back( 
+            DMRG_mps_site_update( i, mpsState, mpsHamiltonian, triple_L, triple_R, double_L, double_R));
+    }
+
+    for(int i = L-2; i >=0; --i){
+        eigenvalues_history.push_back( 
+            DMRG_mps_site_update( i, mpsState, mpsHamiltonian, triple_L, triple_R, double_L, double_R));
+    }
+}
 
 
 #endif //MPS_DMRG_H

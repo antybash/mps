@@ -117,3 +117,10 @@
       and eigenvector -> mps_tensor conversion;
     - Next: DMRG sweep
 
+--------------------------------------------------------------------------
+
+## Tue Jul 26 2016
+
+    - Realized that the update procedure did not left- or right-normalize
+    the MPS states. 
+    - Must implement the update procedure properly.

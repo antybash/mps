@@ -62,7 +62,7 @@ DMRG_double_right_contract_once (tensor<T,3> P, tensor<T,2> A)
 
 template<typename T>
 std::vector<tensor<T,2> >
-DMRG_double_right_contract_recursive (std::vector<tensor<T,3> > mpsState)
+DMRG_double_right_recursive (std::vector<tensor<T,3> > mpsState)
 {
     typedef std::vector<int> vi;
     typedef std::complex<double> cd;
@@ -187,7 +187,7 @@ DMRG_triple_right_contract_once(tensor<T,3> P, tensor<T,4> H, tensor<T,3> A)
 
 template<typename T>
 std::vector<tensor<T,3> >
-DMRG_triple_right_contract_recursive (std::vector<tensor<T,3> > mpsState, std::vector<tensor<T,4> > mpsHamiltonian)
+DMRG_triple_right_recursive (std::vector<tensor<T,3> > mpsState, std::vector<tensor<T,4> > mpsHamiltonian)
 {
     typedef std::vector<int> vi;
     typedef std::complex<double> cd;
