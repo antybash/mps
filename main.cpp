@@ -15,8 +15,6 @@ int main()
     // The real test begins.
     // Hamiltonian: ZZIII + IZZII + IIZZI + IIIZZ + IIIII
 
-    typedef std::complex<double> cd;
-    typedef std::vector<int> vi;
 
     Eigen::Matrix2cd Z;
     Z[0][0] = 1; Z[0][1] =  0;

@@ -11,9 +11,13 @@
 #include <vector>
 #include <complex>
 #include <Eigen/Dense>
+#include <tuple>
 
 #include "increment_indices.h"
 #include "reindexing.h"
+
+typedef std::complex<double> cd;
+typedef std::vector<int> vi;
 
 template<typename T, std::size_t N>
 using tensor = boost::multi_array<T,N>;
@@ -120,6 +124,136 @@ matrix_to_tensor(Eigen::MatrixXcd M, std::array<int,R> row_indices, std::array<i
         increment_index(ind, A.shape());
     } while(!check_all_zeros(ind));
     return A;
+}
+
+std::vector<int> vector_range(int a, int b)
+    //returns a vector [a, a+1, ..., b-1, b] *inclusive*
+{
+    std::vector<int> x(b-a+1);
+    for (int i = 0; i < b-a+1; ++i)
+        x[i] = a+i;
+    return x;
+}
+
+template<typename T, size_t N>
+std::vector<int> tensor_shape(tensor<T,N> t)
+{
+    std::vector<int> x(N);
+    for(int i = 0; i < N; ++i)
+        x[i] = t.shape()[i];
+    return x;
+}
+
+int middle_matrix_size_trim(Eigen::MatrixXcd diag_mat, double epsilon)
+{
+    Eigen::VectorXd vec = diag_mat.diagonal();
+    for (int i = 0; i < vec.size(); ++i)
+        if (abs(vec[i]) < epsilon) 
+            return i-1;
+    return vec.size();
+}
+
+void trim_matrix(Eigen::MatrixXcd &M, int index, int new_index_size)
+{
+    if (index == 0)
+        M.conservativeResize(new_index_size, M.cols());
+    else
+        M.conservativeResize(M.rows(), new_index_size);
+}
+
+int vector_trim_size(Eigen::VectorXcd S, double epsilon)
+{
+    // if trim_size = -1,
+    // then all abs(S[k]) > epsilon
+    // else (S[k] < epsilon <=> k > trim_size)
+    for (int i = 0; i < S.size(); ++i)
+        if(abs(S[i]) < epsilon)
+            return (i-1);
+    return -1;
+}
+
+std::tuple<int, Eigen::MatrixXcd, Eigen::MatrixXcd> svd_then_trim(Eigen::MatrixXcd M, double epsilon)
+{
+    Eigen::JacobiSvd<MatrixXcd> svd(M);
+    int ts = vector_trim_size(svd.singularValues(), epsilon);
+
+    Eigen::MatrixXcd U = svd.matrixU();
+    Eigen::MatrixXcd V = svd.singularValues().asDiagonal()*svd.matrixV();
+    if(trim_size != -1){
+        U.conservativeResize(svd.matrixU().rows(), trim_size);
+        V.conservativeResize(trim_size, svd.matrixV().rows());
+    }
+    return std::make_tuple(ts, U, V);
+}
+
+template<typename T,size_t N>
+std::vector<tensor<T,3> > tensor_to_left_normalized_mps (tensor<T,N> A, double epsilon)
+{
+    using std::begin;
+    using std::advance;
+    std::vector<tensor<T,3> > mpsState(N);
+    // A = A_(i0... i_{n+1})
+    // tmp = A (i0i1) (i2...i_{n+1})
+    Eigen::MatrixXcd tmp       = tensor_to_matrix(A, vi({{0,1}}), vector_range(2,N-1));
+    std::vector<int> tmp_shape = tensor_shape(A);
+
+    int trim;
+    for(int i = 0; i < N-2; ++i){
+        Eigen::MatrixXcd U;
+        Eigen::MatrixXcd V;
+        std::tie (trim, U, V) = svd_then_trim(tmp, epsilon);
+
+        vi first_three_elements(tmp_shape.begin(), tmp_shape.begin()+3);
+        mpsState[i]   = matrix_to_tensor(U, vi({0,1}), vi({2}), vi({tmp_shape[0],tmp_shape[1],trim}));
+
+        // reshape(V)
+        // A01234;     N = 5 = 1+3+1
+        // A(01)(234) --> U(01)(s) V(s)(234)
+        //            --> U[0s1]   V[s,2,3,4]
+
+        int beta = V.cols().size();
+        int n    = tmp_shape.size();
+        std::vector<int> tmp2_shape = number_to_multi_index(beta, vector_range(tmp_shape,2,n-1));
+        tmp2_shape.insert(trim, tmp2_shape);
+        std::vector<int> index (tmp2_shape.size());
+
+        int rows_new = tmp2_shape[0] * tmp2_shape[1];
+        int cols_new = 1;
+        for(int i = 2; i < tmp2_shape.size(); ++i)
+            cols_new *= tmp2_shape[i];
+
+        Eigen::MatrixXcd tmp_new(rows_new, cols_new);
+
+        do {
+            // (s,a2),(a3,...,an)
+            // this defines the new tmp_matrix;
+
+            std::vector<int> vec_i1 = vector_range(index,0,0);
+            std::vector<int> vec_j1 = vector_range(index,1,index.size()-1);
+
+            std::vector<int> vec_a1 = vector_range(tmp2_shape,0,0);
+            std::vector<int> vec_b1 = vector_range(tmp2_shape,1,tmp2_shape.size()-1);
+
+            std::vector<int> vec_i2 = vector_range(index,0,1);
+            std::vector<int> vec_j2 = vector_range(index,2,index.size()-1);
+
+            std::vector<int> vec_a2 = vector_range(tmp2_shape,0,1);
+            std::vector<int> vec_b2 = vector_range(tmp2_shape,2,tmp2_shape.size()-1);
+
+            int i1 = multi_index_to_number(vec_i1, vec_a1);
+            int j1 = multi_index_to_number(vec_j1, vec_b1);
+
+            int i2 = multi_index_to_number(vec_i2, vec_a2);
+            int j2 = multi_index_to_number(vec_j2, vec_b2);
+
+            tmp_new[i2][j2] = V[i1][j1];
+
+        } while (!check_all_zeros_with_selection(index));
+
+        tmp = tmp_new;
+    }
+    // deal with last edge case
+    mpsState[N-1] = matrix_to_tensor(tmp, vi({0,1}),vi({2}), vi({trim,tmp_shape[N-2],tmp_shape[N-1]}));
 }
 
 

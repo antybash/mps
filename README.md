@@ -124,3 +124,16 @@
     - Realized that the update procedure did not left- or right-normalize
     the MPS states. 
     - Must implement the update procedure properly.
+
+--------------------------------------------------------------------------
+
+## Wed Jul 27 2016
+
+    - Wrote up notes on the update algorithm
+
+--------------------------------------------------------------------------
+
+## Sun Jul 31 2016
+
+    - Began implementation of update procedure
+
