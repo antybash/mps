@@ -137,3 +137,10 @@
 
     - Began implementation of update procedure
 
+--------------------------------------------------------------------------
+
+## Fri Aug 5 2016
+
+    - Coded up a faulty version of update procedure Tensor -> MPS
+    - Debugging begins.
+
