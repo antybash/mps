@@ -120,6 +120,7 @@ int main()
     B(vi({1, 1, 1})) = 3;
 */
 
+    /*
     C(vi({0, 0, 0, 0, 0})) = 3;
     C(vi({0, 1, 0, 0, 0})) = 6;
     C(vi({0, 0, 1, 0, 0})) = 10;
@@ -130,7 +131,7 @@ int main()
     C(vi({0, 1, 1, 1, 0})) = 4;
 
     //std::vector<tensor<cd,3> > mpsA = tensor_to_left_normalized_mps(A,10e-4);
-    auto mpsC = tensor_to_left_normalized_mps(C,10e-4);
+    auto mpsC = tensor_to_left_normalized_mps(C,10e-7);
 
     oe("main.cpp:\n\n\t Final tensors:");
     oe(mpsC.size());
@@ -147,6 +148,11 @@ int main()
     std::cout << "The 'final' test:" << std::endl;
     output_tensor( contract( contract(mpsC[0],mpsC[1],two,zero), mpsC[2], three, zero) );
     output_tensor( C );
-            
+    */
+
+    check_svd_1();
+    check_svd_2();
+    check_svd_3();
+
     return 0;
 }

@@ -141,48 +141,40 @@ std::vector<int> tensor_shape(tensor<T,N> t)
 
 int vector_trim_size(Eigen::VectorXcd S, double epsilon)
 {
-    // if trim_size = -1,
-    // then all abs(S[k]) > epsilon
-    // else (S[k] < epsilon <=> k > trim_size)
     for (int i = 0; i < S.size(); ++i)
         if(abs(S[i]) < epsilon)
             return (i-1);
     return S.size();
 }
 
-std::tuple<int, Eigen::MatrixXcd, Eigen::MatrixXcd> svd_then_trim(Eigen::MatrixXcd M, double epsilon)
+std::tuple<Eigen::MatrixXcd, Eigen::MatrixXcd, Eigen::MatrixXcd> custom_svd(Eigen::MatrixXcd M)
 {
-    Eigen::JacobiSVD<Eigen::MatrixXcd> svd(M, Eigen::ComputeThinU | Eigen::ComputeThinV);
-
+    Eigen::JacobiSVD<Eigen::MatrixXcd> svd(M, Eigen::ComputeFullU | Eigen::ComputeFullV);
     Eigen::VectorXcd vecS(svd.singularValues().size());
     for(int i = 0; i < svd.singularValues().size(); ++i)
         vecS[i] = svd.singularValues()[i];
-
-    Eigen::MatrixXcd U = svd.matrixU();
     Eigen::MatrixXcd S = vecS.asDiagonal();
-    Eigen::MatrixXcd V = svd.matrixV();
+    int ur = svd.matrixU().rows();
+    int uc = svd.matrixU().cols();
+    int vr = svd.matrixV().rows();
+    int vc = svd.matrixV().cols();
 
-    if (U.cols() > V.rows())
-        S.conservativeResize(U.cols(), S.cols());
-    else if (U.cols() < V.rows())
-        S.conservativeResize(S.rows(), V.rows());
+    if ( uc > vr )
+        S.conservativeResize(uc, S.cols());
+    else if ( uc < vr )
+        S.conservativeResize(S.rows(), vr);
 
-    oe("U"); oe(U);
-    oe("S"); oe(S);
-    oe("V"); oe(V);
+    return std::make_tuple(svd.matrixU(), S, svd.matrixV().conjugate().transpose());
+}
 
-    V = S * svd.matrixV();
-    oe("V <- S*V"); oe(V);
-
-    oe("before: vector_trim_size");
+std::tuple<int, Eigen::MatrixXcd, Eigen::MatrixXcd> svd_then_trim(Eigen::MatrixXcd M, double epsilon)
+{
+    Eigen::MatrixXcd U, S, V;
+    std::tie(U,S,V) = custom_svd(M);
+    V = S * V;
     int ts = vector_trim_size(S.diagonal(), epsilon);
-    oe(ts);
-    oe("after: vector_trim_size");
-
-    U.conservativeResize(svd.matrixU().rows(), ts);
-    V.conservativeResize(ts, svd.matrixV().rows());
-
-    oe("after resize, done with svd");
+    U.conservativeResize(U.rows(), ts);
+    V.conservativeResize(ts, V.rows());
     return std::make_tuple(ts, U, V);
 }
 
@@ -201,16 +193,16 @@ std::vector<tensor<T,3> > tensor_to_left_normalized_mps (tensor<T,N> A, double e
     std::vector<int> tmp_shape = tensor_shape(A);
 
     int trim;
-    std::cout << "Start left-normalized for-loop" << std::endl;
+    //std::cout << "Start left-normalized for-loop" << std::endl;
     for(int i = 0; i < N-3; ++i){
         Eigen::MatrixXcd U;
         Eigen::MatrixXcd V;
         std::tie (trim, U, V) = svd_then_trim(tmp, epsilon);
 
-        oe(i);
-        oe(U);
+        //oe(i);
+        //oe(U);
         mpsState.push_back( matrix_to_tensor(U, fst, snd, triple(tmp_shape[0],tmp_shape[1],trim)) );
-        oe("left-normalized: done adding U");
+        //oe("left-normalized: done adding U");
 
         // reshape(V)
         // A01234;     N = 5 = 1+3+1
@@ -220,21 +212,21 @@ std::vector<tensor<T,3> > tensor_to_left_normalized_mps (tensor<T,N> A, double e
         tmp_shape.erase(tmp_shape.begin());
         tmp_shape[0] = trim;
 
-        oe("left-normalized: begin inplace swap");
-        oe(V);
-        out(tmp_shape);
+        //oe("left-normalized: begin inplace swap");
+        //oe(V);
+        //out(tmp_shape);
         tmp          = inplace_index_swap_of_underlying_tensor(V, tmp_shape);
-        oe("left-normalized: end inplace swap");
+        //oe("left-normalized: end inplace swap");
     }
 
     // deal with last edge case
-    oe("left-normalized: last mps load");
-    oe(tmp);
-    out(tmp_shape);
-    oe(trim);
-    oe("left-normalized: last mps define");
+    //oe("left-normalized: last mps load");
+    //oe(tmp);
+    //out(tmp_shape);
+    //oe(trim);
+    //oe("left-normalized: last mps define");
     mpsState.push_back(  matrix_to_tensor(tmp, fst, snd, tmp_shape) );
-    oe("left-normalized: last mps done!");
+    //oe("left-normalized: last mps done!");
 
     return mpsState;
 }

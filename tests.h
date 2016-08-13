@@ -206,4 +206,141 @@ bool check7()
         && (A2 == DMRG_triple_left_contract_once(dummy3,m1,h1));
 }
 
+bool eq_eps(Eigen::MatrixXcd M1, Eigen::MatrixXcd M2, double epsilon)
+{
+    if (M1.rows() != M2.rows() || M1.cols() != M2.cols())
+        return false;
+    int R = M1.rows(); 
+    int C = M1.cols();
+    for (int i = 0; i < R; ++i)
+        for(int j = 0; j < C; ++j)
+            if( abs(M1(i,j)-M2(i,j)) > epsilon ){
+                std::cout << "bad at (" << i << ", " << j << ")" << std::endl;
+                return false;
+            }
+    return true;
+}
+
+bool check_svd_1()
+{
+    Eigen::MatrixXcd M(2,2);
+    M << -3, 0,
+          0, 0;
+
+    Eigen::MatrixXcd U,S,V;
+    std::tie(U,S,V) = custom_svd(M);
+
+    Eigen::MatrixXcd u(2,2);
+    Eigen::MatrixXcd s(2,2);
+    Eigen::MatrixXcd v(2,2);
+
+    u << -1, 0,
+          0, 1;
+    s << 3, 0,
+         0, 0;
+    v << 1, 0,
+         0, 1;
+
+    if( !eq_eps(u,U,10e-5) || !eq_eps(s,S,10e-5) || !eq_eps(v,V,10e-5)
+            && !eq_eps(U*S*V, u*s*v,10e-5) )
+    {
+        std::cout << "check_svd_1 failed:" << std::endl;
+        std::cout << "U" << std::endl << U << std::endl
+                  << "S" << std::endl << S << std::endl
+                  << "V" << std::endl << V << std::endl;
+        std::cout << "u" << std::endl << u << std::endl
+                  << "s" << std::endl << s << std::endl
+                  << "v" << std::endl << v << std::endl;
+        std::cout << "USV" << std::endl << U*S*V << std::endl;
+        std::cout << "usv" << std::endl << u*s*v << std::endl;
+        return false;
+    }
+    else {
+        std::cout << "check_svd_1 passed. Congratulations!" << std::endl;
+        return true;
+    }
+}
+
+bool check_svd_2()
+{
+    Eigen::MatrixXcd M(2,2);
+    M << 2, -1,
+         2,  2;
+
+    Eigen::MatrixXcd U,S,V;
+    std::tie(U,S,V) = custom_svd(M);
+
+    Eigen::MatrixXcd u(2,2);
+    Eigen::MatrixXcd s(2,2);
+    Eigen::MatrixXcd v(2,2);
+
+    u << 1.0/sqrt(5), -2.0/sqrt(5),
+         2.0/sqrt(5),  1.0/sqrt(5);
+    s << 3, 0,
+         0, 2;
+    v << 2.0/sqrt(5), 1.0/sqrt(5),
+        -1.0/sqrt(5), 2.0/sqrt(5);
+
+    if( !eq_eps(u,U,10e-5) || !eq_eps(s,S,10e-5) || !eq_eps(v,V,10e-5) 
+            && !eq_eps(U*S*V, u*s*v,10e-5) )
+    {
+        std::cout << "check_svd_2 failed:" << std::endl;
+        std::cout << "U" << std::endl << U << std::endl
+                  << "S" << std::endl << S << std::endl
+                  << "V" << std::endl << V << std::endl;
+        std::cout << "u" << std::endl << u << std::endl
+                  << "s" << std::endl << s << std::endl
+                  << "v" << std::endl << v << std::endl;
+        std::cout << "USV" << std::endl << U*S*V << std::endl;
+        std::cout << "usv" << std::endl << u*s*v << std::endl;
+        return false;
+    }
+    else {
+        std::cout << "check_svd_2 passed. Congratulations!" << std::endl;
+        return true;
+    }
+}
+
+bool check_svd_3()
+{
+    Eigen::MatrixXcd M(3,2);
+    M << 7, 1,
+         0, 0,
+         5, 5;
+
+    Eigen::MatrixXcd U,S,V;
+    std::tie(U,S,V) = custom_svd(M);
+
+    Eigen::MatrixXcd u(3,3);
+    Eigen::MatrixXcd s(3,2);
+    Eigen::MatrixXcd v(2,2);
+
+    u << 1.0/sqrt(2), -1.0/sqrt(2), 0,
+             0      ,      0,       1, 
+         1.0/sqrt(2),  1.0/sqrt(2), 0;
+    s << 3.0*sqrt(10),         0,
+              0,        sqrt(10),
+              0,               0;
+    v << 2.0/sqrt(5), 1.0/sqrt(5),
+        -1.0/sqrt(5), 2.0/sqrt(5);
+
+    if( (!eq_eps(u,U,10e-5) || !eq_eps(s,S,10e-5) || !eq_eps(v,V,10e-5)) 
+            && !eq_eps(U*S*V, u*s*v,10e-5) )
+    {
+        std::cout << "check_svd_3 failed:" << std::endl;
+        std::cout << "U" << std::endl << U << std::endl
+                  << "S" << std::endl << S << std::endl
+                  << "V" << std::endl << V << std::endl;
+        std::cout << "u" << std::endl << u << std::endl
+                  << "s" << std::endl << s << std::endl
+                  << "v" << std::endl << v << std::endl;
+        std::cout << "USV" << std::endl << U*S*V << std::endl;
+        std::cout << "usv" << std::endl << u*s*v << std::endl;
+        return false;
+    }
+    else {
+        std::cout << "check_svd_3 passed. Congratulations!" << std::endl;
+        return true;
+    }
+}
 #endif // MPS_TESTS_H
