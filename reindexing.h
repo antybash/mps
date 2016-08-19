@@ -101,11 +101,11 @@ inplace_index_swap_of_underlying_tensor (Eigen::MatrixXcd M, std::vector<int> sh
      */
     
     int n = shape.size();
-    int gamma = prod(shape,0,2); //prod is clopen: [0,2)
-    int delta = prod(shape,2,n);
-
     int alpha = shape[0];
     int beta  = prod(shape,1,n);
+
+    int gamma = prod(shape,0,2); //prod is clopen: [0,2)
+    int delta = prod(shape,2,n);
 
     assert(M.rows() == alpha);
     assert(M.cols() ==  beta); // prod is clopen: [1,n)

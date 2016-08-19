@@ -6,6 +6,7 @@
 #include <vector>
 #include <algorithm>
 #include <complex>
+#include <cassert>
 
 #include "tensor.h"
 #include "DMRG_contractions.h"
@@ -208,19 +209,55 @@ bool check7()
 
 bool eq_eps(Eigen::MatrixXcd M1, Eigen::MatrixXcd M2, double epsilon)
 {
-    if (M1.rows() != M2.rows() || M1.cols() != M2.cols())
-        return false;
+    assert (M1.rows() == M2.rows());
+    assert (M1.cols() == M2.cols());
+
     int R = M1.rows(); 
     int C = M1.cols();
     for (int i = 0; i < R; ++i)
         for(int j = 0; j < C; ++j)
             if( abs(M1(i,j)-M2(i,j)) > epsilon ){
                 std::cout << "bad at (" << i << ", " << j << ")" << std::endl;
+                std::cout << M1(i,j) << " vs. " << M2(i,j) << std::endl;
                 return false;
             }
     return true;
 }
 
+void check_svd_simple_helper(Eigen::MatrixXcd U, Eigen::MatrixXcd S, Eigen::MatrixXcd V,
+                             int n)
+{
+    std::cout << "output for check_svd_" << n << std::endl;
+    std::cout << "U" << std::endl << U << std::endl
+              << "S" << std::endl << S << std::endl
+              << "V" << std::endl << V << std::endl;
+    std::cout << "USV" << std::endl << U*S*V << std::endl;
+}
+
+bool check_svd_helper(Eigen::MatrixXcd U, Eigen::MatrixXcd S, Eigen::MatrixXcd V,
+                      Eigen::MatrixXcd u, Eigen::MatrixXcd s, Eigen::MatrixXcd v,
+                      int n)
+{
+    if( (!eq_eps(u,U,10e-5) || !eq_eps(s,S,10e-5) || !eq_eps(v,V,10e-5)) 
+            && !eq_eps(U*S*V, u*s*v,10e-5) )
+    {
+        std::cout << "check_svd_" << n << " failed:" << std::endl;
+        std::cout << "U" << std::endl << U << std::endl
+                  << "S" << std::endl << S << std::endl
+                  << "V" << std::endl << V << std::endl;
+        std::cout << "u" << std::endl << u << std::endl
+                  << "s" << std::endl << s << std::endl
+                  << "v" << std::endl << v << std::endl;
+        std::cout << "USV" << std::endl << U*S*V << std::endl;
+        std::cout << "usv" << std::endl << u*s*v << std::endl;
+        return false;
+    }
+    else {
+        std::cout << "check_svd_" << n << " passed. Congratulations!" << std::endl;
+        return true;
+    }
+}
+                            
 bool check_svd_1()
 {
     Eigen::MatrixXcd M(2,2);
@@ -241,24 +278,7 @@ bool check_svd_1()
     v << 1, 0,
          0, 1;
 
-    if( !eq_eps(u,U,10e-5) || !eq_eps(s,S,10e-5) || !eq_eps(v,V,10e-5)
-            && !eq_eps(U*S*V, u*s*v,10e-5) )
-    {
-        std::cout << "check_svd_1 failed:" << std::endl;
-        std::cout << "U" << std::endl << U << std::endl
-                  << "S" << std::endl << S << std::endl
-                  << "V" << std::endl << V << std::endl;
-        std::cout << "u" << std::endl << u << std::endl
-                  << "s" << std::endl << s << std::endl
-                  << "v" << std::endl << v << std::endl;
-        std::cout << "USV" << std::endl << U*S*V << std::endl;
-        std::cout << "usv" << std::endl << u*s*v << std::endl;
-        return false;
-    }
-    else {
-        std::cout << "check_svd_1 passed. Congratulations!" << std::endl;
-        return true;
-    }
+    return check_svd_helper(U,S,V,u,s,v,1);
 }
 
 bool check_svd_2()
@@ -281,24 +301,7 @@ bool check_svd_2()
     v << 2.0/sqrt(5), 1.0/sqrt(5),
         -1.0/sqrt(5), 2.0/sqrt(5);
 
-    if( !eq_eps(u,U,10e-5) || !eq_eps(s,S,10e-5) || !eq_eps(v,V,10e-5) 
-            && !eq_eps(U*S*V, u*s*v,10e-5) )
-    {
-        std::cout << "check_svd_2 failed:" << std::endl;
-        std::cout << "U" << std::endl << U << std::endl
-                  << "S" << std::endl << S << std::endl
-                  << "V" << std::endl << V << std::endl;
-        std::cout << "u" << std::endl << u << std::endl
-                  << "s" << std::endl << s << std::endl
-                  << "v" << std::endl << v << std::endl;
-        std::cout << "USV" << std::endl << U*S*V << std::endl;
-        std::cout << "usv" << std::endl << u*s*v << std::endl;
-        return false;
-    }
-    else {
-        std::cout << "check_svd_2 passed. Congratulations!" << std::endl;
-        return true;
-    }
+    return check_svd_helper(U,S,V,u,s,v,2);
 }
 
 bool check_svd_3()
@@ -324,23 +327,231 @@ bool check_svd_3()
     v << 2.0/sqrt(5), 1.0/sqrt(5),
         -1.0/sqrt(5), 2.0/sqrt(5);
 
-    if( (!eq_eps(u,U,10e-5) || !eq_eps(s,S,10e-5) || !eq_eps(v,V,10e-5)) 
-            && !eq_eps(U*S*V, u*s*v,10e-5) )
-    {
-        std::cout << "check_svd_3 failed:" << std::endl;
-        std::cout << "U" << std::endl << U << std::endl
-                  << "S" << std::endl << S << std::endl
-                  << "V" << std::endl << V << std::endl;
-        std::cout << "u" << std::endl << u << std::endl
-                  << "s" << std::endl << s << std::endl
-                  << "v" << std::endl << v << std::endl;
-        std::cout << "USV" << std::endl << U*S*V << std::endl;
-        std::cout << "usv" << std::endl << u*s*v << std::endl;
+    return check_svd_helper(U,S,V,u,s,v,3);
+}
+
+bool check_svd_4()
+{
+    Eigen::MatrixXcd M(2,3);
+    M << 3, 2, 2,
+         2, 3, -2;
+
+    Eigen::MatrixXcd U,S,V;
+    std::tie(U,S,V) = custom_svd(M);
+
+    Eigen::MatrixXcd u(2,2);
+    Eigen::MatrixXcd s(2,3);
+    Eigen::MatrixXcd v(3,3);
+
+    u << 1.0/sqrt(2), -1.0/sqrt(2),
+         1.0/sqrt(2),  1.0/sqrt(2);
+    s << 5, 0, 0,
+         0, 3, 0;
+    v << 1.0/sqrt(2), 1.0/sqrt(2), 0,
+        -1.0/sqrt(18),1.0/sqrt(18), -4.0/sqrt(18),
+        -2.0/3.0, 2.0/3.0, 1.0/3.0;
+
+    return check_svd_helper(U,S,V,u,s,v,4);
+}
+
+bool check_svd_5()
+{
+    Eigen::MatrixXcd M(4,5);
+    M << 6, -8, -4, 5, -4,
+         2, 7, -5, -6, 4,
+         0, -1, -8, 2, 2,
+         -1, -2, 4, 4, -8;
+
+    Eigen::MatrixXcd U,S,V;
+    std::tie(U,S,V) = custom_svd(M);
+
+    Eigen::MatrixXcd u(2,2);
+    Eigen::MatrixXcd s(2,3);
+    Eigen::MatrixXcd v(3,3);
+
+    u << 1.0/sqrt(2), -1.0/sqrt(2),
+         1.0/sqrt(2),  1.0/sqrt(2);
+    s << 5, 0, 0,
+         0, 3, 0;
+    v << 1.0/sqrt(2), 1.0/sqrt(2), 0,
+        -1.0/sqrt(18),1.0/sqrt(18), -4.0/sqrt(18),
+        -2.0/3.0, 2.0/3.0, 1.0/3.0;
+
+    check_svd_simple_helper(U,S,V,5);
+    return true;
+}
+
+bool check_svd_then_trim_1()
+{
+    Eigen::MatrixXcd M(4,5);
+    M << 6, -8, -4, 5, -4,
+         2, 7, -5, -6, 4,
+         0, -1, -8, 2, 2,
+         -1, -2, 4, 4, -8;
+
+    Eigen::MatrixXcd U,V; 
+    int trim; 
+    std::tie(trim,U,V) = svd_then_trim(M, 5);
+
+    Eigen::MatrixXcd u(4,2); Eigen::MatrixXcd s(2,2); Eigen::MatrixXcd v(2,5);
+    u << -0.57, -0.65,
+          0.63, -0.24,
+          0.07, -0.63,
+         -0.51,  0.34;
+    s << 16.46,     0,
+             0, 12.16;
+    v << -0.10, 0.61, -0.21, -0.52,  0.55,
+         -0.39, 0.29,  0.84, -0.14, -0.19;
+
+    bool a = eq_eps(u,U,0.1);
+    bool b = eq_eps(s*v,V,0.1); 
+    bool c = (trim == 2);
+    if (a && b && c) {
+        std::cout << "check_svd_then_trim_1 passed. Congratulations!" << std::endl;
+        return true;
+    } else {
+        std::cout << "check_svd_then_trim_1 failed: " << a << b << c << std::endl;
         return false;
     }
-    else {
-        std::cout << "check_svd_3 passed. Congratulations!" << std::endl;
+}
+
+template <typename T, size_t N>
+bool eq_tensor(tensor<T,N> A, tensor<T,N> B, double epsilon)
+{
+    for(int i = 0; i < N; ++i)
+        assert(A.shape()[i] == B.shape()[i]);
+    std::vector<int> ind(N);
+    do {
+        if (abs(A(ind) - B(ind)) > epsilon){
+            std::cout << "eq_tensor comparison failed at: " << std::endl;
+            for (auto i : ind) 
+                std::cout << i << " ";
+            std::cout << std::endl;
+            return false;
+        }
+        increment_index(ind,A.shape());
+    } while(!check_all_zeros(ind));
+    return true;
+}
+
+bool check_leftnormalized_1()
+{
+    tensor<cd,5> C(vi({ 1,2,2,2,1 }));
+    C(vi({0, 0, 0, 0, 0})) = 3;  C(vi({0, 1, 0, 0, 0})) = 6;
+    C(vi({0, 0, 1, 0, 0})) = 10; C(vi({0, 1, 1, 0, 0})) = 8;
+    C(vi({0, 0, 0, 1, 0})) = 8;  C(vi({0, 1, 0, 1, 0})) = 7;
+    C(vi({0, 0, 1, 1, 0})) = 1;  C(vi({0, 1, 1, 1, 0})) = 4;
+
+    std::array<int,1> zero  = {0};
+    std::array<int,1> two   = {2};
+    std::array<int,1> three = {3};
+
+    //std::vector<tensor<cd,3> > mpsA = tensor_to_left_normalized_mps(A,10e-4);
+    auto mpsC = tensor_to_left_normalized_mps(C,1e-7);
+    auto contracted_tensor = contract(mpsC[0],contract(mpsC[1],mpsC[2], two, zero), two, zero);
+    if (!eq_tensor(contracted_tensor, C,1e-4)){
+        oe("tests.h -- check_leftnormalized_1:\n\n\t Final tensors:");
+        oe(mpsC.size());
+        for(int i = 0; i < mpsC.size(); ++i){
+            std::cout << "The " << i << "-th tensor has dimensions: ";
+            std::cout << "(" << mpsC[i].shape()[0] << mpsC[i].shape()[1] << mpsC[i].shape()[2] << ")" << std::endl;
+            output_tensor(mpsC[i]);
+        }
+
+        std::cout << "The 'final' test:" << std::endl;
+        output_tensor( contracted_tensor );
+        output_tensor( C );
+        return false;
+    } else {
+        std::cout << "check_leftnormalized_1 passed. Congratulations!" << std::endl;
         return true;
     }
 }
+
+bool check_leftnormalized_2()
+{
+    // look at testing.py
+    // to generate some testcases.
+    // try to generalize the testing code: in particular implement "contract_all" : mps --> n-tensor
+    return false;
+}
+
+/*
+template <size_t N, size_t M>
+tensor<cd,N+M> contract_all(std::vector<tensor<cd,3> > mps, tensor<cd,M> R)
+{
+    std::array<int,1> zero  = {0};
+    std::array<int,1> two   = {2};
+
+    assert(mps.size() == N);
+    return contract_all<cd,N-1,M+1>( std::vector<tensor<cd,3> >(mps.begin(), mps.begin()+N-2), contract(mps[N-1],R,two,zero));
+}
+
+template<typename T,size_t M>
+tensor<T,M> contract_all<T,0,M>(std::vector<tensor<T,3> > mps, tensor<T,M> R)
+{
+    return R;
+}
+
+bool check_leftnormalized_2()
+{
+    tensor<cd,5> C(vi({ 1,2,2,2,1 }));
+    C(vi({0, 0, 0, 0, 0})) = 3;  C(vi({0, 1, 0, 0, 0})) = 6;
+    C(vi({0, 0, 1, 0, 0})) = 10; C(vi({0, 1, 1, 0, 0})) = 8;
+    C(vi({0, 0, 0, 1, 0})) = 8;  C(vi({0, 1, 0, 1, 0})) = 7;
+    C(vi({0, 0, 1, 1, 0})) = 1;  C(vi({0, 1, 1, 1, 0})) = 4;
+
+    //std::vector<tensor<cd,3> > mpsA = tensor_to_left_normalized_mps(A,10e-4);
+    auto mpsC = tensor_to_left_normalized_mps(C,10e-7);
+    auto mpsC_minus_last = std::vector<tensor<cd,3> >(mpsC.begin(),mpsC.begin()+1);
+    auto contracted_tensor = contract_all<cd,2,3>(mpsC_minus_last,mpsC[2]);
+
+    if (!eq_tensor(contracted_tensor, C,10e-4)){
+        oe("tests.h -- check_leftnormalized_1:\n\n\t Final tensors:");
+        oe(mpsC.size());
+        for(int i = 0; i < mpsC.size(); ++i){
+            std::cout << "The " << i << "-th tensor has dimensions: ";
+            std::cout << "(" << mpsC[i].shape()[0] << mpsC[i].shape()[1] << mpsC[i].shape()[2] << ")" << std::endl;
+            output_tensor(mpsC[i]);
+        }
+
+        std::cout << "The 'final' test:" << std::endl;
+        output_tensor( contracted_tensor );
+        output_tensor( C );
+        return false;
+    } else {
+        std::cout << "check_leftnormalized_1 passed. Congratulations!" << std::endl;
+        return true;
+    }
+}
+*/
+
+bool check_DMRG_left_contract_1()
+{
+    tensor<cd,5> psi(vi({1,2,2,2,1}));
+    psi(vi({0, 0, 0, 0, 0})) = 8; psi(vi({0, 1, 0, 0, 0})) = 7; psi(vi({0, 0, 1, 0, 0})) = 10; psi(vi({0, 1, 1, 0, 0})) = 9;
+    psi(vi({0, 0, 0, 1, 0})) = 5; psi(vi({0, 1, 0, 1, 0})) = 1; psi(vi({0, 0, 1, 1, 0})) = 10; psi(vi({0, 1, 1, 1, 0})) = 8;
+
+    auto mps = tensor_to_left_normalized_mps(psi);
+    auto vec = DMRG_double_left_recursive(mps);
+    auto lst = vec[vec.size()-1];
+
+    std::array<int,5> indices;
+    std::iota(indices.begin(),indices.end(),0);
+    auto ten = contract(psi,psi,indices,indices,true,false);
+
+    // the last element in vec_contract is a 2-tensor of type (1,1)
+    // therefore, effectively a scalar!
+    double norm_mps = abs(lst[0][0]);
+    double norm_ten = abs(ten(std::vector<int>()));
+    if ( abs(norm_mps - norm_ten) > 1e-4 ){
+        std::cout << "check_DMRG_left_contract_1: (norm-mps," << norm_mps << ") vs. (norm_ten," << norm_ten << ")" << std::endl;
+        return false;
+    } else {
+        std::cout << "check_DMRG_left_contract_1 passed. Congratulations!" << std::endl;
+        return true;
+    }
+}
+
+
 #endif // MPS_TESTS_H

@@ -32,13 +32,13 @@ DMRG_double_left_recursive (std::vector<tensor<T,3> > mpsState)
     typedef std::vector<int> vi;
     typedef std::complex<double> cd;
 
-    std::vector<tensor<T,2> > vectorLeft(mpsState.size()+1);
+    std::vector<tensor<T,2> > vectorLeft;
 
-    vectorLeft[0] = tensor<T,2>(vi({{1,1}}));
-    vectorLeft[0](vi({{0,0}})) = 1;
+    vectorLeft.push_back( tensor<T,2>(vi({1,1})) );
+    vectorLeft[0](vi({0,0})) = 1;
 
     for (int i = 1; i <= mpsState.size(); ++i)
-        vectorLeft[i] = DMRG_double_left_contract_once(vectorLeft[i-1],mpsState[i-1]);
+        vectorLeft.push_back( DMRG_double_left_contract_once(vectorLeft[i-1],mpsState[i-1]) );
     
     return vectorLeft;
 }
@@ -69,12 +69,12 @@ DMRG_double_right_recursive (std::vector<tensor<T,3> > mpsState)
 
     int L = mpsState.size();
 
-    std::vector<tensor<T,2> > vectorRight(L+1);
-    vectorRight[0] = tensor<T,2>(vi ( {{1,1}} ));
+    std::vector<tensor<T,2> > vectorRight;
+    vectorRight.push_back( tensor<T,2>(vi ( {{1,1}} )) );
     vectorRight[0](vi({{0,0}})) = 1;
 
     for (int i = 1; i <= L; ++i)
-        vectorRight[i] = DMRG_double_right_contract_once(mpsState[L-i],vectorRight[i-1]);
+        vectorRight.push_back( DMRG_double_right_contract_once(mpsState[L-i],vectorRight[i-1]) );
 
     return vectorRight;
 }
@@ -145,13 +145,13 @@ DMRG_triple_left_recursive (std::vector<tensor<T,3> > mpsState, std::vector<tens
     typedef std::vector<int> vi;
     typedef std::complex<double> cd;
 
-    std::vector<tensor<T,3> > vectorLeft(mpsState.size()+1);
+    std::vector<tensor<T,3> > vectorLeft;
 
-    vectorLeft[0] = tensor<T,3>(vi({{1,1,1}}));
+    vectorLeft.push_back( tensor<T,3>(vi({{1,1,1}})) );
     vectorLeft[0](vi({{0,0,0}})) = 1;
     
     for (int i = 1; i <= mpsState.size(); ++i)
-        vectorLeft[i] = DMRG_triple_left_contract_once(vectorLeft[i-1],mpsState[i-1],mpsHamiltonian[i-1]);
+        vectorLeft.push_back( DMRG_triple_left_contract_once(vectorLeft[i-1],mpsState[i-1],mpsHamiltonian[i-1]) );
     
     return vectorLeft;
 }
@@ -194,12 +194,12 @@ DMRG_triple_right_recursive (std::vector<tensor<T,3> > mpsState, std::vector<ten
 
     int L = mpsState.size();
 
-    std::vector<tensor<T,3> > vectorRight(L+1);
-    vectorRight[0] = tensor<T,3>(vi({{1,1,1}}));
+    std::vector<tensor<T,3> > vectorRight;
+    vectorRight.push_back( tensor<T,3>(vi({{1,1,1}})) );
     vectorRight[0](vi({{0,0,0}})) = 1;
 
     for (int i = 1; i <= L; ++i)
-        vectorRight[i] = DMRG_triple_right_contract_once(mpsState[L-i], mpsHamiltonian[L-i],vectorRight[i-1]);
+        vectorRight.push_back( DMRG_triple_right_contract_once(mpsState[L-i], mpsHamiltonian[L-i],vectorRight[i-1]) );
 
     return vectorRight;
 }

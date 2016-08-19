@@ -12,6 +12,20 @@
 #include <algorithm>
 #include <cassert>
 
+/// OUTPUT ///
+template<typename T>
+void out(T t) {
+    copy(t.begin(),t.end(), std::ostream_iterator<int>(std::cout, " "));
+    std::cout << std::endl;
+}
+
+template<typename T>
+void oe(T s)
+{
+    std::cout << s << std::endl;
+}
+/// OUTPUT ///
+
 
 bool check_all_zeros(std::vector<int> index)
 {

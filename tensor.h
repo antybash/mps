@@ -29,6 +29,15 @@ void output_tensor(tensor<T,N> t)
     std::cout << std::endl;
 }
 
+template<typename T, size_t N>
+void output_tensortype(tensor<T,N> t)
+{
+    std::cout << "(";
+    for(int i = 0; i < N; ++i)
+        std::cout << t.shape()[i] << ",";
+    std::cout << ")" << std::endl;
+}
+
 template<typename T, std::size_t N, std::size_t M, std::size_t dA, std::size_t dB>
     tensor<T,N+M-dA-dB> 
 contract(tensor<T,N> A, tensor<T,M> B, std::array<int,dA> barA, std::array<int,dB> barB, bool conjA=false, bool conjB=false)
@@ -143,7 +152,7 @@ int vector_trim_size(Eigen::VectorXcd S, double epsilon)
 {
     for (int i = 0; i < S.size(); ++i)
         if(abs(S[i]) < epsilon)
-            return (i-1);
+            return i;
     return S.size();
 }
 
@@ -174,60 +183,35 @@ std::tuple<int, Eigen::MatrixXcd, Eigen::MatrixXcd> svd_then_trim(Eigen::MatrixX
     V = S * V;
     int ts = vector_trim_size(S.diagonal(), epsilon);
     U.conservativeResize(U.rows(), ts);
-    V.conservativeResize(ts, V.rows());
+    V.conservativeResize(ts, V.cols());
     return std::make_tuple(ts, U, V);
 }
 
 
 template<typename T,size_t N>
-std::vector<tensor<T,3> > tensor_to_left_normalized_mps (tensor<T,N> A, double epsilon)
+std::vector<tensor<T,3> > tensor_to_left_normalized_mps (tensor<T,N> A, double epsilon=1e-4)
 {
     std::array<int,2> fst = {{0,1}};
     std::array<int,1> snd = {{ 2 }};
-
     std::vector<tensor<T,3> > mpsState;
-
     // A = A_(i0... i_{n+1})
     // tmp = A (i0i1) (i2...i_{n+1})
     Eigen::MatrixXcd tmp       = tensor_to_matrix(A, fst, array_range<2,N-1>());
     std::vector<int> tmp_shape = tensor_shape(A);
 
     int trim;
-    //std::cout << "Start left-normalized for-loop" << std::endl;
-    for(int i = 0; i < N-3; ++i){
+    for(int i = 0; i < N-3; ++i){ //std::cout << "tensor_to_left_normalized_mps: for loop " << i << std::endl;
         Eigen::MatrixXcd U;
         Eigen::MatrixXcd V;
         std::tie (trim, U, V) = svd_then_trim(tmp, epsilon);
-
-        //oe(i);
-        //oe(U);
         mpsState.push_back( matrix_to_tensor(U, fst, snd, triple(tmp_shape[0],tmp_shape[1],trim)) );
-        //oe("left-normalized: done adding U");
-
-        // reshape(V)
-        // A01234;     N = 5 = 1+3+1
         // A(01)(234) --> U(01)(s) V(s)(234)
-        //            --> U[0s1]   V[s,2,3,4]
-
+        //            --> U[01s]   V[s,2,3,4]
         tmp_shape.erase(tmp_shape.begin());
         tmp_shape[0] = trim;
-
-        //oe("left-normalized: begin inplace swap");
-        //oe(V);
-        //out(tmp_shape);
         tmp          = inplace_index_swap_of_underlying_tensor(V, tmp_shape);
-        //oe("left-normalized: end inplace swap");
     }
-
-    // deal with last edge case
-    //oe("left-normalized: last mps load");
-    //oe(tmp);
-    //out(tmp_shape);
-    //oe(trim);
-    //oe("left-normalized: last mps define");
     mpsState.push_back(  matrix_to_tensor(tmp, fst, snd, tmp_shape) );
-    //oe("left-normalized: last mps done!");
-
     return mpsState;
 }
 
