@@ -83,7 +83,7 @@ void increment_index_with_barrier(std::vector<int> &index, std::vector<int> &sha
 template<typename T>
 void increment_index_with_selection(std::vector<int> &index, std::vector<int> &shape, T selection)
 {
-    std::sort(selection.begin(),selection.end());
+    //std::sort(selection.begin(),selection.end());
     for (int i : selection){
         if(index[i] < shape[i]-1){
             ++index[i]; // this part is only encountered once!

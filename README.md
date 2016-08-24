@@ -144,3 +144,13 @@
     - Coded up a faulty version of update procedure Tensor -> MPS
     - Debugging begins.
 
+-------------------------------------------------------------------------
+
+## Tue Aug 23
+
+    - Debugging finally ends. The following are now working:
+        - tensor -> mps
+        - spin hamiltonian -> mpo
+        - contractions for DMRG (inner prod / expectation value) 
+    - Next up: DMRG procedure!
+
