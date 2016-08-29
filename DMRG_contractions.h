@@ -12,7 +12,7 @@
 
 template<typename T>
 tensor<T,2>
-DMRG_double_left_contract_once (tensor<T,2> A, tensor<T,3> P)
+DMRG_double_left_contract_once (tensor<T,2> &A, tensor<T,3> &P)
 {
     std::array<int,1> x = {{ 0 }};
     tensor<T,3> T1 = contract(A,P,x,x,false,true);
@@ -27,7 +27,7 @@ DMRG_double_left_contract_once (tensor<T,2> A, tensor<T,3> P)
 
 template<typename T>
 std::vector<tensor<T,2> >
-DMRG_double_left_recursive (std::vector<tensor<T,3> > mpsState)
+DMRG_double_left_recursive (std::vector<tensor<T,3> > &mpsState)
 {
     typedef std::vector<int> vi;
     typedef std::complex<double> cd;
@@ -90,15 +90,21 @@ DMRG_double_update_site(int new_site, std::vector<tensor<T,3> > &mpsState,
     // This function will update the corresponding vectorLeft and
     // vectorRight by calling the DMRG_contract_once on each of them
 
-    int L = mpsState.size();
-    vectorLeft [new_site]   = DMRG_double_left_contract_once (vectorLeft[new_site],mpsState[new_site]); // check this with DMRG function
-    vectorRight[L-new_site] = DMRG_double_right_contract_once(mpsState[new_site],vectorRight[L-new_site-1]);
+    int L   = mpsState.size();
+    int vli = new_site+1;
+    int vri = L-new_site;
+
+    vectorLeft [vli] = DMRG_double_left_contract_once  (vectorLeft[vli-1],  mpsState[new_site]); // check this with DMRG function
+    vectorRight[vri] = DMRG_double_right_contract_once (mpsState[new_site], vectorRight[vri-1]);
     /*
-     *     L = 5
-     *    new_site   ==     0 1 2 3 4 
-     *   vectorLeft  ==   0 1 2 3 4 5
-     *   vectorRight ==     5 4 3 2 1 0
+     *     L = 6
+     *    new_site   ==     0 1 2 3 4 5
+     *   vectorLeft  ==   0 1 2 3 4 5 6
+     *   vectorRight ==     6 5 4 3 2 1 0
      *
+     *                    i      i      i = new_site
+     *                   i+1    i+1
+     *                   L-i    6-i
      */
 }
 
@@ -169,7 +175,7 @@ DMRG_triple_right_contract_once(tensor<T,3> P, tensor<T,4> H, tensor<T,3> A)
      *
      */
 
-    std::array<int,3> x = {{ 2 }};
+    std::array<int,1> x = {{ 2 }};
     tensor<T,4> T1 = contract(P,A,x,x);
     // T1 = (P0 P1 A0 A1)
 
@@ -214,15 +220,47 @@ DMRG_triple_update_site(int new_site, std::vector<tensor<T,3> > &mpsState, std::
     // vectorRight by calling the DMRG_contract_once on each of them
 
     int L = mpsState.size();
-    vectorLeft [new_site]   = DMRG_double_left_contract_once (vectorLeft[new_site],mpsState[new_site], mpsHamiltonian[new_site]); 
-    vectorRight[L-new_site] = DMRG_double_right_contract_once(mpsState[new_site],mpsHamiltonian[new_site],vectorRight[L-new_site-1]);
+    int vli = new_site+1;   // these are the vectorLeft & vectorRight indices corresponding to the mpsState[new_site]
+    int vri = L-new_site;
+
+//    std::cout << "DMRG_triple_update_site started --" << std::endl;
+//
+//    std::cout << "mpsState" << std::endl;       output_tensorfull(mpsState[new_site]);
+//    std::cout << "mpsHamiltonian" << std::endl; output_tensorfull(mpsHamiltonian[new_site]);
+//    std::cout << "vectorLeft" << std::endl;     output_tensorfull(vectorLeft[vli]);
+//    std::cout << "vectorRight" << std::endl;    output_tensorfull(vectorRight[vri]);
+
+      vectorLeft [vli] = DMRG_triple_left_contract_once (vectorLeft[vli-1],    mpsState[new_site],       mpsHamiltonian[new_site]); 
+      vectorRight[vri] = DMRG_triple_right_contract_once(mpsState[new_site], mpsHamiltonian[new_site], vectorRight[vri-1]);
+
+//    std::cout << "DMRG_triple_update_site finished!" << std::endl;
+
     /*
      *     L = 5
-     *    new_site   ==     0 1 2 3 4 
-     *   vectorLeft  ==   0 1 2 3 4 5
-     *   vectorRight ==     5 4 3 2 1 0
+     *    new_site   ==     0 1 2 3 4 5
+     *   vectorLeft  ==   0 1 2 3 4 5 6
+     *   vectorRight ==     6 5 4 3 2 1 0
      *
      */
 }
+
+///////////////////////////////////////////////////////////////////////////////////////////////
+
+template<typename T>
+double
+DMRG_current_eigenvalue (std::vector<tensor<T,3> > &mpsState, std::vector<tensor<T,4> > mpoHam)
+{
+    /*********************************
+     *            <psi | H | psi>    *
+     * Computes   ---------------    *
+     *              <psi | psi>      *
+     *********************************/
+    auto numer = DMRG_triple_left_recursive(mpsState,mpoHam);
+    auto denom = DMRG_double_left_recursive(mpsState);
+
+    return std::real(simplify_constant_tensor(*numer.rbegin()) /
+                     simplify_constant_tensor(*denom.rbegin())   );
+}
+
 
 #endif //MPS_DMRG_CONTRACTIONS_H

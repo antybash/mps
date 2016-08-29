@@ -15,6 +15,7 @@
 
 #include "increment_indices.h"
 #include "reindexing.h"
+#include "utilities.h"
 
 typedef std::complex<double> cd;
 typedef std::vector<int> vi;
@@ -95,6 +96,7 @@ contract(tensor<T,N> A, tensor<T,M> B, std::array<int,dA> barA, std::array<int,d
                     sum += std::conj(A(indA)) * B(indB);
                 else
                     sum += A(indA) * B(indB);
+
 /*
                 std::cout << "\tA === (";
                 for(int i = 0; i < N; ++i)
@@ -150,10 +152,7 @@ tensor_to_matrix(tensor<T,R+C> A, std::array<int,R> row_indices, std::array<int,
     do {
         int a = multi_index_to_number(reindexing_subset(ind, row_indices), reindexing_subset(A.shape(), row_indices));
         int b = multi_index_to_number(reindexing_subset(ind, col_indices), reindexing_subset(A.shape(), col_indices));
-
-        
         M(a,b) = A(ind);
-
         increment_index(ind, A.shape());
     } while(!check_all_zeros(ind));
     return M;
@@ -223,7 +222,8 @@ std::tuple<Eigen::MatrixXcd, Eigen::MatrixXcd, Eigen::MatrixXcd> custom_svd(Eige
     return std::make_tuple(svd.matrixU(), S, svd.matrixV().conjugate().transpose());
 }
 
-std::tuple<int, Eigen::MatrixXcd, Eigen::MatrixXcd> svd_then_trim(Eigen::MatrixXcd M, double epsilon)
+std::tuple<int, Eigen::MatrixXcd, Eigen::MatrixXcd> 
+svd_then_trim (Eigen::MatrixXcd M, double epsilon)
 {
     Eigen::MatrixXcd U, S, V;
     std::tie(U,S,V) = custom_svd(M);
@@ -236,14 +236,13 @@ std::tuple<int, Eigen::MatrixXcd, Eigen::MatrixXcd> svd_then_trim(Eigen::MatrixX
 
 
 template<typename T,size_t N>
-std::vector<tensor<T,3> > tensor_to_left_normalized_mps (tensor<T,N> A, double epsilon=1e-4)
+std::vector<tensor<T,3> > 
+tensor_to_left_normalized_mps (tensor<T,N> A, double epsilon=1e-4)
 {
-    std::array<int,2> fst = {{0,1}};
-    std::array<int,1> snd = {{ 2 }};
     std::vector<tensor<T,3> > mpsState;
     // A = A_(i0... i_{n+1})
     // tmp = A (i0i1) (i2...i_{n+1})
-    Eigen::MatrixXcd tmp       = tensor_to_matrix(A, fst, array_range<2,N-1>());
+    Eigen::MatrixXcd tmp       = tensor_to_matrix(A, ar::zeroone, array_range<2,N-1>());
     std::vector<int> tmp_shape = tensor_shape(A);
 
     int trim;
@@ -251,20 +250,20 @@ std::vector<tensor<T,3> > tensor_to_left_normalized_mps (tensor<T,N> A, double e
         Eigen::MatrixXcd U;
         Eigen::MatrixXcd V;
         std::tie (trim, U, V) = svd_then_trim(tmp, epsilon);
-        mpsState.push_back( matrix_to_tensor(U, fst, snd, triple(tmp_shape[0],tmp_shape[1],trim)) );
+        mpsState.push_back( matrix_to_tensor(U, ar::zeroone, ar::two, triple(tmp_shape[0],tmp_shape[1],trim)) );
         // A(01)(234) --> U(01)(s) V(s)(234)
         //            --> U[01s]   V[s,2,3,4]
         tmp_shape.erase(tmp_shape.begin());
         tmp_shape[0] = trim;
         tmp          = inplace_index_swap_of_underlying_tensor(V, tmp_shape);
     }
-    mpsState.push_back(  matrix_to_tensor(tmp, fst, snd, tmp_shape) );
+    mpsState.push_back(  matrix_to_tensor(tmp, ar::zeroone, ar::two, tmp_shape) );
     return mpsState;
 }
 
 
 template<typename T, size_t N>
-T simplify_constant_tensor (tensor<T,N> t)
+T simplify_constant_tensor (tensor<T,N> &t)
 {
     std::vector<int> shape(N);
     for(int i = 0; i < N; ++i){
