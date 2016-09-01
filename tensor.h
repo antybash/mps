@@ -23,40 +23,6 @@ typedef std::vector<int> vi;
 template<typename T, std::size_t N>
 using tensor = boost::multi_array<T,N>;
 
-template<std::size_t N, typename T>
-void output_tensorfull(tensor<T,N> t)
-{
-    std::vector<int> ind(N);
-    std::vector<int> shape(N);
-    for(int i = 0; i < N; ++i)
-        shape[i] = t.shape()[i];
-
-    do{
-        std::cout << "(";
-        for(int i = 0; i < N; ++i)
-            std::cout << ind[i] << ",";
-        std::cout << ") = " << t(ind) << std::endl;
-
-        increment_index(ind,shape);
-    } while( !check_all_zeros(ind) );
-}
-
-template<std::size_t N, typename T>
-void output_tensor(tensor<T,N> t)
-{
-    copy(t.origin(),t.origin()+t.num_elements(), std::ostream_iterator<T>(std::cout, " "));
-    std::cout << std::endl;
-}
-
-template<typename T, size_t N>
-void output_tensortype(tensor<T,N> t)
-{
-    std::cout << "(";
-    for(int i = 0; i < N; ++i)
-        std::cout << t.shape()[i] << ",";
-    std::cout << ")" << std::endl;
-}
-
 template<typename T, std::size_t N, std::size_t M, std::size_t dA, std::size_t dB>
 tensor<T,N+M-dA-dB> 
 contract(tensor<T,N> A, tensor<T,M> B, std::array<int,dA> barA, std::array<int,dB> barB, bool conjA=false, bool conjB=false)
@@ -73,17 +39,6 @@ contract(tensor<T,N> A, tensor<T,M> B, std::array<int,dA> barA, std::array<int,d
 
     combine(vecC,vecA,vecB,barA,barB);
     tensor<T,N+M-dA-dB> C(vecC);
-
-/*
-    std::cout << "Begin contraction:" << std::endl;
-    std::cout << "A type -- ";       output_tensortype(A);
-    std::cout << "A tensor --\n";    output_tensorfull(A);
-    std::cout << std::endl;
-    std::cout << "B type -- ";       output_tensortype(B);
-    std::cout << "B tensor --\n";    output_tensorfull(B);
-    std::cout << std::endl;
-*/
-
     do {
         do {
             T sum = 0;
@@ -97,17 +52,6 @@ contract(tensor<T,N> A, tensor<T,M> B, std::array<int,dA> barA, std::array<int,d
                 else
                     sum += A(indA) * B(indB);
 
-/*
-                std::cout << "\tA === (";
-                for(int i = 0; i < N; ++i)
-                    std::cout << indA[i] << ",";
-                std::cout << ") = " << A(indA) << std::endl;
-                std::cout << "\tB === (";
-                for(int i = 0; i < M; ++i)
-                    std::cout << indB[i] << ",";
-                std::cout << ") = " << B(indB) << std::endl;
-*/
-
                 increment_index_with_selection(indA, vecA, barA);
                 increment_index_with_selection(indB, vecB, barB);
 
@@ -118,21 +62,11 @@ contract(tensor<T,N> A, tensor<T,M> B, std::array<int,dA> barA, std::array<int,d
             combine(indC, indA, indB, barA, barB);        // set value of indC
             C(indC) = sum;                                // set value of C
 
-/*
-            std::cout << "\t\t C === (";
-            for(int i = 0; i < N+M-dA-dB; ++i)
-                std::cout << indC[i] << ",";
-            std::cout << ") = " << C(indC) << std::endl;
-*/
-
             increment_index_with_barrier(indB,vecB,barB); // increment the outside
         } while(!check_all_zeros_with_barrier(indB,barB));
         increment_index_with_barrier(indA,vecA,barA);
     } while(!check_all_zeros_with_barrier(indA,barA));
 
-//    std::cout << "C type -- ";       output_tensortype(C);
-//    std::cout << "C tensor --\n";    output_tensorfull(C);
-//    std::cout << std::endl;
     return C;
 }
 
@@ -191,7 +125,9 @@ int vector_trim_size(Eigen::VectorXcd S, double epsilon)
     return S.size();
 }
 
-std::tuple<Eigen::MatrixXcd, Eigen::MatrixXcd, Eigen::MatrixXcd> custom_svd(Eigen::MatrixXcd M)
+std::tuple<Eigen::MatrixXcd, Eigen::MatrixXcd, Eigen::MatrixXcd> 
+custom_svd
+(Eigen::MatrixXcd M)
 {
     Eigen::JacobiSVD<Eigen::MatrixXcd> svd(M, Eigen::ComputeFullU | Eigen::ComputeFullV);
     Eigen::VectorXcd vecS(svd.singularValues().size());
@@ -234,7 +170,6 @@ svd_then_trim (Eigen::MatrixXcd M, double epsilon)
     return std::make_tuple(ts, U, V);
 }
 
-
 template<typename T,size_t N>
 std::vector<tensor<T,3> > 
 tensor_to_left_normalized_mps (tensor<T,N> A, double epsilon=1e-4)
@@ -261,6 +196,63 @@ tensor_to_left_normalized_mps (tensor<T,N> A, double epsilon=1e-4)
     return mpsState;
 }
 
+template<typename T>
+int
+check_left_canoncial (std::vector<tensor<T,3> > mps)
+{
+    /* convert successive contractions into a 2-tensor
+     * convert to matrix
+     * check if identity                               */
+
+    for(int i = 0; i < mps.size(); ++i){
+        auto tmp = contract(mps[i],mps[i],ar::zeroone, ar::zeroone, false, true);
+
+        Eigen::MatrixXcd tmp_mat = tensor_to_matrix(tmp, ar::zero, ar::one);
+        assert(tmp_mat.rows() == tmp_mat.cols()); //contracting mps[i]--mps[i] have equal type on their right arms so results in a square matrix
+
+        // checks whether tmp_mat == identity
+        int d = tmp_mat.rows();
+        for(int j = 0; j < d; ++j){
+            for(int k = 0; k < d; ++k) {
+                if      ( j == k && abs(tmp_mat(j,k) - cd(1)) > 1e-2 )
+                    return i;
+                else if ( j != k && abs(tmp_mat(j,k) - cd(0)) > 1e-2 )
+                    return i;
+            }
+        }
+
+    }
+
+    return -1;
+}
+
+template<typename T>
+int
+check_right_canoncial (std::vector<tensor<T,3> > mps)
+{
+    /* convert successive contractions into a 2-tensor
+     * convert to matrix
+     * check if identity                               */
+
+    for(int i = 0; i < mps.size(); ++i){
+        auto tmp = contract(mps[i],mps[i],ar::onetwo, ar::onetwo, false, true);
+
+        Eigen::MatrixXcd tmp_mat = tensor_to_matrix(tmp, ar::zero, ar::one);
+        assert(tmp_mat.rows() == tmp_mat.cols()); //contracting mps[i]--mps[i] have equal type on their right arms so results in a square matrix
+
+        // checks whether tmp_mat == identity
+        int d = tmp_mat.rows();
+        for(int j = 0; j < d; ++j){
+            for(int k = 0; k < d; ++k) {
+                if      ( j == k && abs(tmp_mat(j,k) - cd(1)) > 1e-2 )
+                    return i;
+                else if ( j != k && abs(tmp_mat(j,k) - cd(0)) > 1e-2 )
+                    return i;
+            }
+        }
+    }
+    return -1;
+}
 
 template<typename T, size_t N>
 T simplify_constant_tensor (tensor<T,N> &t)
@@ -312,6 +304,44 @@ namespace mpo {
     }
 
 };
+
+//////////////////////////////////////////////////////////
+// DEBUGGING FUNCTIONS 
+//////////////////////////////////////////////////////////
+
+template<std::size_t N, typename T>
+void output_tensorfull(tensor<T,N> t)
+{
+    std::vector<int> ind(N);
+    std::vector<int> shape(N);
+    for(int i = 0; i < N; ++i)
+        shape[i] = t.shape()[i];
+
+    do{
+        std::cout << "(";
+        for(int i = 0; i < N; ++i)
+            std::cout << ind[i] << ",";
+        std::cout << ") = " << t(ind) << std::endl;
+
+        increment_index(ind,shape);
+    } while( !check_all_zeros(ind) );
+}
+
+template<std::size_t N, typename T>
+void output_tensor(tensor<T,N> t)
+{
+    copy(t.origin(),t.origin()+t.num_elements(), std::ostream_iterator<T>(std::cout, " "));
+    std::cout << std::endl;
+}
+
+template<typename T, size_t N>
+void output_tensortype(tensor<T,N> t)
+{
+    std::cout << "(";
+    for(int i = 0; i < N; ++i)
+        std::cout << t.shape()[i] << ",";
+    std::cout << ")" << std::endl;
+}
 
 
 
