@@ -84,7 +84,6 @@ DMRG<N>::eigen_solve (int pos)
     std::array<int,3> cols = {{ 1,2,5 }};
 
     Eigen::MatrixXcd H = tensor_to_matrix(T2,rows,cols);  //TODO: check self-adjoint-ness
-    std::cout << H << std::endl << std::endl;
 
     Eigen::SelfAdjointEigenSolver<Eigen::MatrixXcd> es;
     es.compute(H);
@@ -177,9 +176,9 @@ void DMRG<N>::right_sweep_once()
     auto M = tensor_to_matrix(eigentensor, ar::zeroone, ar::two);
     Eigen::MatrixXcd U,S,V;
     std::tie(U,S,V) = custom_svd(M);
-    std::vector<int> prev_shape = { prevState.shape()[0], prevState.shape()[1], prevState.shape()[2] }; 
+    std::vector<int> prev_shape = { (int)prevState.shape()[0], (int)prevState.shape()[1], (int)prevState.shape()[2] }; 
     left_push( U, prev_shape, k ); // This is the update of L1, L2, L3.
-                                   // TODO: check whether the exist state
+                                   // TODO: check whether the exit state
                                    // satisfies normalization conditions.
     assert( L1.size() == k+1 );
     assert( L2.size() == 1+L1.size() );

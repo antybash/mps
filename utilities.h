@@ -27,6 +27,8 @@ namespace ar {
     std::array<int,3> a_345 = {3,4,5};
 
     std::array<int,4> a_1234 = {1,2,3,4};
+
+    std::array<int,6> a_123456 = {1,2,3,4,5,6};
 }
 
 #endif

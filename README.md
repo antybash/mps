@@ -1,156 +1,43 @@
 # mps
 
---------------------------------------------------------------------------
+## Dependencies
 
-## Tue Jun 21, 2016
+Linear algebra: [*Eigen*](http://eigen.tuxfamily.org/)
 
-    - the first code iteration was messy and not organized
-    - began second iteration
-    - goals: make modular and relatively well-documented 
-             (at the very least readable)
-    - Interesting Discoveries: multi_array<int,0> is supported and is
-    accessed using
+## Running the code
 
-            a(vector<int>())
-    - Questions: What is a const_iterator?
+terminal> g++ main.cpp -o dmrg -std=c++11 -g -I /PATH/TO/EIGEN/ 
+terminal> ./dmrg
 
-    - next: testing contract.cpp
+On my system this is how I run the program.
 
---------------------------------------------------------------------------
+terminal> g++ main.cpp -o dmrg -std=c++11 -g -I /usr/local/include/eigen-eigen-1306d75b4a21 
+terminal> ./dmrg
 
-## Wed Jun 22, 2016
+## How it works
 
-    - contract.cpp seems to be working - no bugs found yet
-    - trying to organize code (move some files into header)
+The key equation that is being solved iteratively looks like:
 
---------------------------------------------------------------------------
+    LWR.M = lam.M
 
-## Thu Jun 23, 2016
+The L denotes the *left* side of the triple contraction (psi|H|psi), W
+denotes the local Hamiltonian, and R denotes the *right* side of the triple
+contraction. M denotes the to-be-determined local MPS state.
 
-    - contract_check1 and contract_check2 work! (or they were working...)
-    - completely mangled the templates and now the errors are unreadable:
-    full of instantiation problems.
+A state of the DMRG consists of 4-stacks:
 
---------------------------------------------------------------------------
+    - The L stack: denoted L3 for *triple* left contraction
+    - The left-normalized stack:  denoted L1, consisting of the left-normalized MPS
+    - The right-normalized stack: denoted R1, consisting of the right-normalized MPS
+    - The R stack: denoted R3 for *triple* right contraction
 
-## Wed Jul 13, 2016
+A left-sweep:
 
-    I'm back! Feynman diagram project now done. Time to focus efforts on
-    coding for a bit.
+    - Starts with a full L-stack and left-normalized stack and one-by-one
+    pops off (or sweeps off) the left-stacks and pushes new updated
+    right-normalized states onto the R1 and R3 stacks.
 
-    - Finished: explanation of dmrg using mps
-        (~/Documents/masters/mps/mps-notes.pdf)
-    - Found the reason why the instantiation problems were arising:
-        -> added a new "feature": barA, barB, selection could all be
-        vector-like containers, however, implemented this with templates
-        WITHIN the cpp file (usually templated-functions need to be
-                implemented in the header files)
-        -> solution: 
-            (a) enforce a vector structure for all such 
-                index-type containers
-            (b) enforce templated-functions ALWAYS go in header file
+A right-sweep:
 
---------------------------------------------------------------------------
-
-## Thu Jul 14, 2016
-
-    - Question: Just renaming tests.cpp -> test.h fixed a
-    multiple-definition problem; why?
-
-    - All tests work. 
-
-    - Question: Why in did I make barA and barB array's!?!
-    - Question: Template instantiation requires a lot of overhead (compile
-                    time is "supposedly" increased)
-                I have not bumped into this, but is this true?
-                Is there any way to mitigate this and save on compile time
-
-    - MPS notes say that there are four things to implement:
-        1. Full state -> MPS (implement epsilon-cutoff)
-        2. Structure for contraction of < psi | psi > and  
-            < psi | H | psi >
-        3. Reformat tensor to matrix to tensor
-        4. Generalized eigenvalue problem
-        
-    - Decreasing difficulty: 4,2,1,3
-
-    - Began implementing 3; ran into a few problems with Eigen
-    	-> solution: take the time to read Eigen's documentation fully
-		     it will surely be beneficial later on!!!
-
---------------------------------------------------------------------------
-
-## Fri Jul 16 2016
-
-    - Finished Reading Eigen documentation
-
---------------------------------------------------------------------------
-
-## Sun Jul 17 2016
-
-    - Learn to implement operator<< for vector<int>
-    - All tests for   tensor_to_matrix,  matrix_to_tensor   
-      passed successfully.
-    - July 14 - #3 done.
-
-    - Next goal: J14 #4 (generalized eigenvalue problem)
-      which is another self-contained problem!
-         ----> SOLVED!
-
-         Eigen::GeneralizedSelfAdjointEigenSolver(H,N)
-         where $H$ is the Hamiltonian and $N$ is the auxillary matrix
-    - July 14 - #4 done.
-
-    - Next goal: J14 #2 -- restructure < psi | psi >
-
---------------------------------------------------------------------------
-
-## Mon Jul 18 2016
-    
-    - Implemented J14 #2 -- vector of prefix- and suffix- contractions of 
-      < psi | psi > and < psi | H | psi > (all of these are contained in
-      DMRG_contractions.h
-    - Also implemented an update procedure to the prefix/suffix vector for
-      use in the DMRG sweep
-    - I have not tested this part of the implementation
-    - Implemented tensor -> matrix conversion (for eigenvector equation)
-      and eigenvector -> mps_tensor conversion;
-    - Next: DMRG sweep
-
---------------------------------------------------------------------------
-
-## Tue Jul 26 2016
-
-    - Realized that the update procedure did not left- or right-normalize
-    the MPS states. 
-    - Must implement the update procedure properly.
-
---------------------------------------------------------------------------
-
-## Wed Jul 27 2016
-
-    - Wrote up notes on the update algorithm
-
---------------------------------------------------------------------------
-
-## Sun Jul 31 2016
-
-    - Began implementation of update procedure
-
---------------------------------------------------------------------------
-
-## Fri Aug 5 2016
-
-    - Coded up a faulty version of update procedure Tensor -> MPS
-    - Debugging begins.
-
--------------------------------------------------------------------------
-
-## Tue Aug 23
-
-    - Debugging finally ends. The following are now working:
-        - tensor -> mps
-        - spin hamiltonian -> mpo
-        - contractions for DMRG (inner prod / expectation value) 
-    - Next up: DMRG procedure!
+    - Sweeps the full R-stacks to and builds the L-stack.
 
