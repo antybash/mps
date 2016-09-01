@@ -6,13 +6,13 @@ Linear algebra: [*Eigen*](http://eigen.tuxfamily.org/)
 
 ## Running the code
 
-terminal> g++ main.cpp -o dmrg -std=c++11 -g -I /PATH/TO/EIGEN/ 
-terminal> ./dmrg
+    terminal> g++ main.cpp -o dmrg -std=c++11 -g -I /PATH/TO/EIGEN/ 
+    terminal> ./dmrg
 
 On my system this is how I run the program.
 
-terminal> g++ main.cpp -o dmrg -std=c++11 -g -I /usr/local/include/eigen-eigen-1306d75b4a21 
-terminal> ./dmrg
+    terminal> g++ main.cpp -o dmrg -std=c++11 -g -I /usr/local/include/eigen-eigen-1306d75b4a21 
+    terminal> ./dmrg
 
 ## How it works
 
@@ -22,7 +22,9 @@ The key equation that is being solved iteratively looks like:
 
 The L denotes the *left* side of the triple contraction (psi|H|psi), W
 denotes the local Hamiltonian, and R denotes the *right* side of the triple
-contraction. M denotes the to-be-determined local MPS state.
+contraction. M denotes the to-be-determined local MPS state. For more
+details see the article by Schollwock (Eq 211 in
+[arXiv:1008.3477](https://arxiv.org/abs/1008.3477))
 
 A state of the DMRG consists of 4-stacks:
 

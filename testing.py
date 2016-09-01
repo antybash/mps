@@ -6,7 +6,7 @@ def prod ( lst ):
         return 1;
     return lst[0]* prod(lst[1:])
 
-def print_random_cpp_tensor( index_list, large_limit=10, tensor_name="A" ):
+def print_random_cpp_tensor( index_list, large_limit=100, tensor_name="psi" ):
     N = prod ( index_list )
     lst = []
     for i in range(0,N):
