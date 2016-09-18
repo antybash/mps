@@ -12,6 +12,7 @@
 #include <Eigen/Dense>
 #include <tuple>
 #include <string>
+#include <random>
 
 #include "increment_indices.h"
 #include "reindexing.h"
@@ -265,6 +266,31 @@ T simplify_constant_tensor (tensor<T,N> &t)
     return t(shape);
 }
 
+tensor<cd,3> random_mps_site(vi shape)
+{
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_int_distribution<> dis(-100,100);
+
+    tensor<cd,3> x(shape);
+    for(int i = 0; i < shape[0]; ++i)
+        for(int j = 0; j < shape[1]; ++j)
+            for(int k = 0; k < shape[2]; ++k)
+                x[i][j][k] = dis(gen);
+    return x;
+}
+
+template<size_t N>
+std::vector<tensor<cd,3> > random_mps(int D)
+{
+    std::vector<tensor<cd,3> > mps;
+    mps.push_back(random_mps_site(vi({1,2,D})));
+    for(int i = 0; i < N-4; ++i)
+        mps.push_back(random_mps_site(vi({D,2,D})));
+    mps.push_back(random_mps_site(vi({D,2,D})));
+    return mps;
+}
+
 void set_mpo(int r, int c, tensor<cd,4> &t, Eigen::MatrixXcd M)
 {
     for (int sg_out = 0; sg_out < 2; ++sg_out)
@@ -272,7 +298,85 @@ void set_mpo(int r, int c, tensor<cd,4> &t, Eigen::MatrixXcd M)
             t[r][sg_in][sg_out][c] = M(sg_out,sg_in);     /// M_ab = <a|M|b>
 }
 
-namespace mpo {
+namespace mpo_heis {
+    // pauli-matrices
+    Eigen::Matrix2cd X;
+    Eigen::Matrix2cd Y;
+    Eigen::Matrix2cd Z;
+    Eigen::Matrix2cd I;
+    Eigen::Matrix2cd zero;
+
+    // spin-Hamiltonian
+    tensor<cd,4> startH(vi({{1,2,2,7}}));
+    tensor<cd,4> middleH(vi({{7,2,2,7}}));
+    tensor<cd,4> endH(vi({{7,2,2,1}}));
+
+    bool initialized_check_spin = false;
+
+    void initialize(){
+        //if (initialized_check_spin)
+        //   break;
+        X(0,0) =  0;        X(0,1) = 1;        X(1,0) = 1;         X(1,1) = 0;
+        Y(0,0) =  0;        Y(0,1) = cd(0,-1); Y(1,0) = cd(0,1);   Y(1,1) = -1;
+        Z(0,0) =  1;        Z(0,1) = 0;        Z(1,0) = 0;         Z(1,1) = -1;
+        I(0,0) =  1;        I(0,1) = 0;        I(1,0) = 0;         I(1,1) = 1;
+        zero(0,0) = 0; zero(0,1) = 0; zero(1,0) = 0; zero(1,1) = 0;
+
+        set_mpo(0,0, startH, I);
+        set_mpo(0,1, startH, I);
+        set_mpo(0,2, startH, I);
+        set_mpo(0,3, startH, X);
+        set_mpo(0,4, startH, Y);
+        set_mpo(0,5, startH, Z);
+        set_mpo(0,6, startH, zero);
+
+        //block: top-left
+        set_mpo(0,0, middleH, I);                  set_mpo(0,1, middleH, zero);               set_mpo(0,2, middleH, zero);  //
+        set_mpo(1,0, middleH, zero);               set_mpo(1,1, middleH, I);                  set_mpo(1,2, middleH, zero);  // TOP ROW
+        set_mpo(2,0, middleH, zero);               set_mpo(2,1, middleH, zero);               set_mpo(2,2, middleH, I);     //
+            //block: top-middle                                                                                                 //
+            set_mpo(0,3, middleH, X);                  set_mpo(0,4, middleH, zero);               set_mpo(0,5, middleH, zero);  //
+            set_mpo(1,3, middleH, zero);               set_mpo(1,4, middleH, Y);                  set_mpo(1,5, middleH, zero);  // TOP ROW
+            set_mpo(2,3, middleH, zero);               set_mpo(2,4, middleH, zero);               set_mpo(2,5, middleH, Z);     //
+                //block: top-right                                                                                                  //
+                set_mpo(0,6, middleH, zero);
+                set_mpo(1,6, middleH, zero);
+                set_mpo(2,6, middleH, zero);
+
+        //block: middle-left
+        set_mpo(3,0, middleH, I);                  set_mpo(3,1, middleH, zero);               set_mpo(3,2, middleH, zero);  //
+        set_mpo(4,0, middleH, zero);               set_mpo(4,1, middleH, I);                  set_mpo(4,2, middleH, zero);  // MIDDLE ROW
+        set_mpo(5,0, middleH, zero);               set_mpo(5,1, middleH, zero);               set_mpo(5,2, middleH, I);     //
+            //block: middle-middle                                                                                              //
+            set_mpo(3,3, middleH, zero);               set_mpo(3,4, middleH, zero);               set_mpo(3,5, middleH, zero);  //
+            set_mpo(4,3, middleH, zero);               set_mpo(4,4, middleH, zero);               set_mpo(4,5, middleH, zero);  // MIDDLE ROW
+            set_mpo(5,3, middleH, zero);               set_mpo(5,4, middleH, zero);               set_mpo(5,5, middleH, zero);  //
+                //block: middle-right                                                                                               //
+                set_mpo(3,6, middleH, X);
+                set_mpo(4,6, middleH, Y);
+                set_mpo(5,6, middleH, Z); // Delta * Z goes here!
+
+        //block: bottom-left
+        set_mpo(6,0, middleH, zero);               set_mpo(6,1, middleH, zero);               set_mpo(6,2, middleH, zero);  // BOTTOM ROW
+            //block: bottom-middle                                                                                              //
+            set_mpo(6,3, middleH, zero);               set_mpo(6,4, middleH, zero);               set_mpo(6,5, middleH, zero);  // BOTTOM ROW
+                //block: bottom-right                                                                                               //
+                set_mpo(6,6, middleH, I);
+
+
+        set_mpo(0,0, endH,zero);
+        set_mpo(1,0, endH,zero);
+        set_mpo(2,0, endH,zero);
+        set_mpo(3,0, endH,X);
+        set_mpo(4,0, endH,Y);
+        set_mpo(5,0, endH,Z);
+        set_mpo(6,0, endH,I);
+    }
+
+};
+
+
+namespace mpo_spin {
     // pauli-matrices
     Eigen::Matrix2cd Z;
     Eigen::Matrix2cd I;
