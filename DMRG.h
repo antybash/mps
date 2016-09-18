@@ -3,11 +3,13 @@
 #define DMRG_H
 
 #include <iostream>
+#include <iomanip>
 #include <iterator>
 #include <Eigen/Dense>
 #include <vector>
 #include <complex>
 #include <stack>
+#include <set>
 
 #include "tensor.h"
 #include "utilities.h"
@@ -32,54 +34,103 @@ class DMRG {
 
         std::vector<double> eigenvalue_history;
 
-        std::tuple<Eigen::VectorXcd,double> eigen_solve(int);
-        tensor<cd,3> eigenvector_to_mps(Eigen::VectorXcd, tensor<cd,3>);
-        void left_push (Eigen::MatrixXcd, std::vector<int>, int);  // given a properly normalized eigentensor
-        void right_push(Eigen::MatrixXcd, std::vector<int>, int);  // push the left/right states
+        std::tuple<double, Eigen::VectorXcd, std::vector<int> > eigen_solve(int);
+        tensor<cd,3> eigenvector_to_mps  (Eigen::VectorXcd, std::vector<int>);
+        tensor<cd,3> left_normalize_mps  (tensor<cd,3>);
+        tensor<cd,3> right_normalize_mps (tensor<cd,3>);
+        tensor<cd,3> normalize_mps       (tensor<cd,3>, bool);
+
+        void left_push (tensor<cd,3>, int);  // given a properly normalized eigentensor
+        void right_push(tensor<cd,3>, int);  // push the left/right states
 
         void right_sweep_once(); // doing one update loses information (and hence this method is private)
         void left_sweep_once();  // must update the entire sequence, and keep solving eigensolving!
 
     public:
-        DMRG (tensor<cd,N>, std::vector<tensor<cd,4> >, double);
+        //DMRG (tensor<cd,N>, std::vector<tensor<cd,4> >, double);                // (psi, mpo, cutoff)
+        //DMRG (int, std::vector<tensor<cd,4> >, double);                           // (mpo, cutoff)
+
+        DMRG (int, double); // assume heisenberg XYZ
 
         void right_sweep(); 
         void left_sweep(); 
 
+        void sweep(int);
+
         void output_eigenvalue_history();
-        std::vector<tensor<cd,3> > right_normalized_final_state();
+        void output_lowest_energy();
+
+        std::vector<tensor<cd,3> > final_mps_state();
+
+        void output_current_norm();
 };
+
+template<size_t N>
+void
+DMRG<N>::output_current_norm()
+{
+    if (R1.size() != 0) {
+        std::cout << "The norm of the final_state is: "
+                  << simplify_constant_tensor(R2.top())
+                  << std::endl;
+    } else {
+        std::cout << "The norm of the final_state is: "
+                  << simplify_constant_tensor(L2.top())
+                  << std::endl;
+    }
+}
+
+template<size_t N>
+void
+DMRG<N>::output_lowest_energy()
+{
+    std::cout << "Chain length: " << N-2 << "; eigenvalue: " << *(eigenvalue_history.rbegin()) << std::endl;
+}
 
 template<size_t N>
 void
 DMRG<N>::output_eigenvalue_history()
 {
-    std::cout << "The eigenvalue history is: ";
-    for(int i = 0; i < eigenvalue_history.size(); ++i)
-        std::cout << eigenvalue_history[i] << ", ";
+    std::vector<double> t2(eigenvalue_history.begin(),eigenvalue_history.end());
+    std::unique(t2.begin(), t2.end());
+
+    std::cout << "The eigenvalue history is: " << std::endl;
+    for(int i = 0; i < t2.size(); ++i)
+        std::cout << std::setprecision(20) << t2[i] << std::endl;
     std::cout << std::endl;
 }
 
 template<size_t N>
 std::vector<tensor<cd,3> >
-DMRG<N>::right_normalized_final_state()
+DMRG<N>::final_mps_state()
 {
-    std::stack <tensor<cd,3> > right = R1;
-    std::vector<tensor<cd,3> > x;
-    for(int i = 0; i < N-2; ++i){
-        x.push_back(R1.top());
-        R1.pop();
+    if (R1.size() != 0) {
+        std::stack <tensor<cd,3> > right = R1;
+        std::vector<tensor<cd,3> > x;
+        for(int i = 0; i < N-2; ++i){
+            x.push_back(right.top());
+            right.pop();
+        }
+        return x;
+    } else {
+        std::stack <tensor<cd,3> > left = L1;
+        std::vector<tensor<cd,3> > x;
+        for(int i = 0; i < N-2; ++i){
+            x.push_back(left.top());
+            left.pop();
+        }
+        return x;
     }
-    return x;
+
 }
 
-
 template<size_t N>
-std::tuple<Eigen::VectorXcd, double>
+std::tuple<double, Eigen::VectorXcd, std::vector<int> >
 DMRG<N>::eigen_solve (int pos)
 {
     tensor<cd,5> T1 = contract(L3.top(), hamiltonian[pos],   ar::one,  ar::zero); // (l0 l1 l2) (h0 h1 h2 h3)  ----->  (l0 l2 h1 h2 h3)
     tensor<cd,6> T2 = contract(T1,       R3.top(),           ar::four, ar::one);  // (l0 l2 h1 h2 h3) (r0 r1 r2) --->  (l0 l2 h1 h2 r0 r2)
+                                                                                                                     //  0  1  2  3  4  5 
     std::array<int,3> rows = {{ 0,3,4 }};
     std::array<int,3> cols = {{ 1,2,5 }};
 
@@ -88,17 +139,21 @@ DMRG<N>::eigen_solve (int pos)
     Eigen::SelfAdjointEigenSolver<Eigen::MatrixXcd> es;
     es.compute(H);
 
-    return std::make_tuple(es.eigenvectors().col(0), es.eigenvalues()[0]);
+    return std::make_tuple(
+            es.eigenvalues()[0],
+            es.eigenvectors().col(0), 
+            vi({ (int)T2.shape()[1], (int)T2.shape()[3], (int)T2.shape()[5]  }) );
 }
+
+////////////////////////////////////////////////////////////////////////
+// This section is to take a solution to the eigenvalue equation      //
+// and produce the correct mps that is will replace the old one.      //
+////////////////////////////////////////////////////////////////////////
 
 template<size_t N>
 tensor<cd,3>
-DMRG<N>::eigenvector_to_mps(Eigen::VectorXcd vec, tensor<cd,3> prevState)
+DMRG<N>::eigenvector_to_mps(Eigen::VectorXcd vec, std::vector<int> shape)
 {
-    std::vector<int> shape(3);
-    shape[0] = prevState.shape()[0];
-    shape[1] = prevState.shape()[1];
-    shape[2] = prevState.shape()[2];
     tensor<cd,3> T(shape);
 
     std::vector<int> index;
@@ -110,44 +165,84 @@ DMRG<N>::eigenvector_to_mps(Eigen::VectorXcd vec, tensor<cd,3> prevState)
 }
 
 template<size_t N>
+tensor<cd,3>
+DMRG<N>::left_normalize_mps(tensor<cd,3> mps)
+{
+    Eigen::MatrixXcd U,S,V;
+    auto M = tensor_to_matrix(mps, ar::zeroone, ar::two);   // mps_(sσ)(s') = M_αβ
+    std::tie(U,S,V) = custom_svd(M);
+
+    int ts = vector_trim_size(S.diagonal(), epsilon);
+    U.conservativeResize(U.rows(), ts);                      //// CONSERVATIVE RESIZE !!!!! ////
+
+    std::vector<int> shape = { (int) mps.shape()[0], (int) mps.shape()[1], ts };
+    return matrix_to_tensor(U, ar::zeroone, ar::two, shape);
+}
+
+template<size_t N>
+tensor<cd,3>
+DMRG<N>::right_normalize_mps(tensor<cd,3> mps)
+{
+    Eigen::MatrixXcd U,S,V;
+    auto M = tensor_to_matrix(mps, ar::zero, ar::onetwo);   // mps_(s)(σs') = M_αβ
+    std::tie(U,S,V) = custom_svd(M);
+
+    int ts = vector_trim_size(S.diagonal(), epsilon);
+    V.conservativeResize(ts, V.cols());                      //// CONSERVATIVE RESIZE !!!!! ////
+
+    std::vector<int> shape = { ts, (int) mps.shape()[1], (int) mps.shape()[2] };
+    return matrix_to_tensor(V, ar::zero, ar::onetwo, shape);
+}
+
+template<size_t N>
+tensor<cd,3> 
+DMRG<N>::normalize_mps(tensor<cd,3> mps, bool left_or_right)
+{
+    if (left_or_right == 0) // left
+        return left_normalize_mps (mps);
+    else                    // right
+        return right_normalize_mps(mps);
+}
+
+
+
+template<size_t N>
 void 
-DMRG<N>::left_push (Eigen::MatrixXcd tmp, std::vector<int> tmp_shape, int ham_pos)
+DMRG<N>::left_push (tensor<cd,3> mps, int ham_pos) // for right-sweep
 {
     auto H = hamiltonian[ham_pos];
-    auto tU = matrix_to_tensor(tmp, ar::zeroone, ar::two, tmp_shape);
     auto x = L2.top();
     auto y = L3.top();
 
-    auto x1 = contract(x,tU,ar::zero,ar::zero,false,true);
-    auto x2 = contract(x1,tU,ar::zeroone,ar::zeroone,false,false);
+    auto x1 = contract(x, mps,ar::zero,ar::zero,false,true);
+    auto x2 = contract(x1,mps,ar::zeroone,ar::zeroone,false,false);
 
-    auto y1 = contract(y,tU,    ar::zero,   ar::zero,false,true);
-    auto y2 = contract(y1,H,    ar::zerotwo,ar::zerotwo);
-    auto y3 = contract(y2,tU,   ar::zerotwo,ar::zeroone);
+    auto y1 = contract(y,mps,    ar::zero,   ar::zero,false,true);
+    auto y2 = contract(y1,H,     ar::zerotwo,ar::zerotwo);
+    auto y3 = contract(y2,mps,   ar::zerotwo,ar::zeroone);
 
-    L1.push( tU );
+    L1.push( mps);
     L2.push( x2 );
     L3.push( y3 );
 }
 
 template<size_t N>
 void 
-DMRG<N>::right_push(Eigen::MatrixXcd tmp, std::vector<int> tmp_shape, int ham_pos)
+DMRG<N>::right_push(tensor<cd,3> mps, int ham_pos) // for left-sweep
 {
     auto H = hamiltonian[ham_pos];
 
-    auto tU = matrix_to_tensor(tmp, ar::zero, ar::onetwo, tmp_shape); // TODO: check the indices
     auto x = R2.top();
     auto y = R3.top();
 
-    auto x1 = contract(tU,x,ar::two,ar::zero,true,false);
-    auto x2 = contract(x1,tU,ar::onetwo,ar::onetwo,false,false);
+    auto x1 = contract(mps,x,ar::two,ar::zero,true,false);
+    auto x2 = contract(x1,mps,ar::onetwo,ar::onetwo,false,false);
 
-    auto y1 = contract(tU,y,    ar::two,      ar::two); 
-    auto y2 = contract(H,y1,    ar::onethree, ar::onethree);
-    auto y3 = contract(tU,y2,   ar::onetwo,   ar::onethree, true, false);
+    auto y1 = contract(mps,y,    ar::two,      ar::two); 
+    auto y2 = contract(H,y1,     ar::onethree, ar::onethree);
+    auto y3 = contract(mps,y2,   ar::onetwo,   ar::onethree, true, false);
 
-    R1.push( tU );
+    R1.push( mps);
     R2.push( x2 );
     R3.push( y3 );
 }
@@ -157,99 +252,113 @@ template<size_t N>
 void DMRG<N>::right_sweep_once()
 {
     int k = L1.size(); // this is the position that is of interest to us: mpoH[k] 
-
-    auto prevState = R1.top();
     R1.pop();
     R2.pop();
     R3.pop();
     
     //TODO:check that it's an eigenvalue problem => Psi_L and Psi_R
+    Eigen::VectorXcd  vec;
+    double            eigenval;
+    std::vector<int>  new_shape;
 
-    Eigen::VectorXcd vec;
-    double eigenval;
-    std::tie(vec,eigenval) = eigen_solve(k);
+    std::tie(eigenval,vec,new_shape) = eigen_solve(k);
     eigenvalue_history.push_back(eigenval);
 
-    tensor<cd,3> eigentensor = eigenvector_to_mps( vec, prevState );
-    // CANNOT just add eigenvector to L1 and update L2, L3: we must left-normalize it first!
+    tensor<cd,3> eigentensor_not_normalized = eigenvector_to_mps( vec, new_shape );
+    tensor<cd,3> eigentensor_normalized     = left_normalize_mps(eigentensor_not_normalized);
 
-    auto M = tensor_to_matrix(eigentensor, ar::zeroone, ar::two);
-    Eigen::MatrixXcd U,S,V;
-    std::tie(U,S,V) = custom_svd(M);
-    std::vector<int> prev_shape = { (int)prevState.shape()[0], (int)prevState.shape()[1], (int)prevState.shape()[2] }; 
-    left_push( U, prev_shape, k ); // This is the update of L1, L2, L3.
-                                   // TODO: check whether the exit state
-                                   // satisfies normalization conditions.
-    assert( L1.size() == k+1 );
-    assert( L2.size() == 1+L1.size() );
-    assert( L3.size() == 1+L1.size() );
+    left_push( eigentensor_normalized, k ); // This is the update of L1, L2, L3.  TODO: check whether the exit state satisfies normalization conditions.
+
+    assert( L1.size() == k+1 ); assert( L2.size() == 1+L1.size() ); assert( L3.size() == 1+L1.size() );
 }
 
 template<size_t N>
 void DMRG<N>::right_sweep()
 {
-    for(int i = 0; i < N-2; ++i)
+    for(int i = 0; i < N-2; ++i){
         right_sweep_once();
+    }
 }
 
 template<size_t N>
-void 
-DMRG<N>::left_sweep_once()
+void DMRG<N>::left_sweep_once()
 {
     int k = L1.size()-1; // this is the position that is of interest to us: mpoH[k] 
-    auto prevState = L1.top();
     L1.pop();
     L2.pop();
     L3.pop();
-    
+
     //TODO:check that it's an eigenvalue problem => Psi_L times Psi_R equals identity 
     Eigen::VectorXcd vec;
     double eigenval;
-    std::tie(vec,eigenval) = eigen_solve(k);
+    std::vector<int> new_shape;
+    std::tie(eigenval,vec,new_shape) = eigen_solve(k);
     eigenvalue_history.push_back(eigenval);
 
-    tensor<cd,3> eigentensor = eigenvector_to_mps( vec, prevState );
+    tensor<cd,3> eigentensor_not_normalized = eigenvector_to_mps ( vec, new_shape );
+    tensor<cd,3> eigentensor_normalized     = right_normalize_mps(eigentensor_not_normalized);
 
-    // cannot just add eigenvector to R1 and update R2, R3: we must 
-    // **RIGHT-NORMALIZE** it first!
-    auto M = tensor_to_matrix(eigentensor, ar::zero, ar::onetwo);
-    Eigen::MatrixXcd U,S,V;
-    std::tie(U,S,V) = custom_svd(M);
-    std::vector<int> prev_shape({(int)prevState.shape()[0], (int)prevState.shape()[1], (int)prevState.shape()[2] }); 
-    right_push( V, prev_shape, k ); // This is the update of L1, L2, L3.
-                                    // TODO: check whether the exist state
-                                    // satisfies normalization conditions.
-    assert( L1.size() + R1.size() == N-2 );
-    assert( R1.size() == R2.size()-1 );
-    assert( R1.size() == R3.size()-1 );
+    right_push( eigentensor_normalized, k ); // This is the update of R1, R2, R3. TODO: check whether the exit state satisfies normalization conditions.
+
+    assert( L1.size() + R1.size() == N-2 ); assert( R1.size() == R2.size()-1 ); assert( R1.size() == R3.size()-1 );
 }
-
 
 template<size_t N>
 void DMRG<N>::left_sweep()
 {
-    for(int i = 0; i < N-2; ++i)
+    for(int i = 0; i < N-2; ++i){
         left_sweep_once();
+    }
 }
 
 template<size_t N>
-DMRG<N>::DMRG ( tensor<cd,N> psi, std::vector<tensor<cd,4> > H, double eps )
+void DMRG<N>::sweep(int num_sweeps)
 {
+    for(int i = 0; i < num_sweeps; ++i){
+        left_sweep();
+        right_sweep();
+    }
+}
+
+template<size_t N>
+DMRG<N>::DMRG ( int D, double eps )
+{
+
     epsilon = eps;
+    
+    ///////////// DECLARE MPO /////////////////
+
+    std::vector<tensor<cd,4> > H;
+    H.push_back( mpo_heis::startH );
+    for(int i = 0; i < N-4; ++i)
+        H.push_back( mpo_heis::middleH );
+    H.push_back( mpo_heis::endH );
+
     hamiltonian = H;
+
+    ///////////// DECLARE MPS /////////////////
 
     tensor<cd,2> f2(vi({1,1}));   f2(vi({0,0}))   = 1; L2.push(f2); R2.push(f2);  // initialize stacks
     tensor<cd,3> f3(vi({1,1,1})); f3(vi({0,0,0})) = 1; L3.push(f3); R3.push(f3);
 
-    Eigen::MatrixXcd tmp       = tensor_to_matrix(psi, ar::zeroone, array_range<2,N-1>());
-    std::vector<int> tmp_shape = tensor_shape(psi);
+    //Eigen::MatrixXcd tmp       = tensor_to_matrix(psi, ar::zeroone, array_range<2,N-1>());
+    //std::vector<int> tmp_shape = tensor_shape(psi);
 
+    std::vector<int> tmp_shape;
     int trim;
+    Eigen::MatrixXcd U;
+    Eigen::MatrixXcd V;
+
     for(int i = 0; i <= N-3; ++i){ 
-        Eigen::MatrixXcd U;
-        Eigen::MatrixXcd V;
         if (i < N-3) {
-            std::tie (trim, U, V) = svd_then_trim(tmp, epsilon);
+            if (i == 0)
+                tmp_shape = triple(1,2,D);
+            else
+                tmp_shape = triple(trim,2,D);
+
+            auto M = tensor_to_matrix(random_mps_site(tmp_shape), ar::zeroone, ar::two);
+            std::tie (trim, U, V) = svd_then_trim(M, epsilon);
+            
             auto tU = matrix_to_tensor(U, ar::zeroone, ar::two, triple(tmp_shape[0],tmp_shape[1],trim));
             auto x = L2.top();
             auto y = L3.top();
@@ -265,12 +374,14 @@ DMRG<N>::DMRG ( tensor<cd,N> psi, std::vector<tensor<cd,4> > H, double eps )
             L2.push( x2 );
             L3.push( y3 );
 
-            tmp_shape.erase(tmp_shape.begin());          // 01234 -> 1234     A(01)(234) --> U(01)(s) V(s)(234)
-            tmp_shape[0] = trim;                         // 1234  -> s234                --> U[01s]   V[s,2,3,4]
-            tmp          = inplace_index_swap_of_underlying_tensor(V, tmp_shape); // (s,234) -> (s2,34)
+            //tmp_shape.erase(tmp_shape.begin());          // 01234 -> 1234     A(01)(234) --> U(01)(s) V(s)(234)
+            //tmp_shape[0] = trim;                         // 1234  -> s234                --> U[01s]   V[s,2,3,4]
+            //tmp          = inplace_index_swap_of_underlying_tensor(V, tmp_shape); // (s,234) -> (s2,34)
 
         } else {
-            auto tU = matrix_to_tensor(tmp, ar::zeroone, ar::two, tmp_shape);
+            tmp_shape = triple(trim,2,1);
+            //std::tie (trim, U, V) = svd_then_trim(random_mps_site(tmp_shape), epsilon);
+            auto tU = random_mps_site(tmp_shape);
             auto x = L2.top();
             auto y = L3.top();
 
@@ -289,5 +400,61 @@ DMRG<N>::DMRG ( tensor<cd,N> psi, std::vector<tensor<cd,4> > H, double eps )
     }
 }
 
+//   template<size_t N>
+//   DMRG<N>::DMRG ( tensor<cd,N> psi, std::vector<tensor<cd,4> > H, double eps )
+//   {
+//       epsilon = eps;
+//       hamiltonian = H;
+//
+//       tensor<cd,2> f2(vi({1,1}));   f2(vi({0,0}))   = 1; L2.push(f2); R2.push(f2);  // initialize stacks
+//       tensor<cd,3> f3(vi({1,1,1})); f3(vi({0,0,0})) = 1; L3.push(f3); R3.push(f3);
+//
+//       Eigen::MatrixXcd tmp       = tensor_to_matrix(psi, ar::zeroone, array_range<2,N-1>());
+//       std::vector<int> tmp_shape = tensor_shape(psi);
+//
+//       int trim;
+//       for(int i = 0; i <= N-3; ++i){ 
+//           Eigen::MatrixXcd U;
+//           Eigen::MatrixXcd V;
+//           if (i < N-3) {
+//               std::tie (trim, U, V) = svd_then_trim(tmp, epsilon);
+//               auto tU = matrix_to_tensor(U, ar::zeroone, ar::two, triple(tmp_shape[0],tmp_shape[1],trim));
+//               auto x = L2.top();
+//               auto y = L3.top();
+//
+//               auto x1 = contract(x,tU,ar::zero,ar::zero,false,true);
+//               auto x2 = contract(x1,tU,ar::zeroone,ar::zeroone,false,false);
+//
+//               auto y1 = contract(y,tU,    ar::zero,   ar::zero,false,true); // conjugate P
+//               auto y2 = contract(y1,H[i], ar::zerotwo,ar::zerotwo);
+//               auto y3 = contract(y2,tU,   ar::zerotwo,ar::zeroone);
+//
+//               L1.push( tU );
+//               L2.push( x2 );
+//               L3.push( y3 );
+//
+//               tmp_shape.erase(tmp_shape.begin());          // 01234 -> 1234     A(01)(234) --> U(01)(s) V(s)(234)
+//               tmp_shape[0] = trim;                         // 1234  -> s234                --> U[01s]   V[s,2,3,4]
+//               tmp          = inplace_index_swap_of_underlying_tensor(V, tmp_shape); // (s,234) -> (s2,34)
+//
+//           } else {
+//               auto tU = matrix_to_tensor(tmp, ar::zeroone, ar::two, tmp_shape);
+//               auto x = L2.top();
+//               auto y = L3.top();
+//
+//               auto x1 = contract(x,tU,ar::zero,ar::zero,false,true);
+//               auto x2 = contract(x1,tU,ar::zeroone,ar::zeroone,false,false);
+//
+//               auto y1 = contract(y,tU,    ar::zero,   ar::zero,false,true); // conjugate P
+//               auto y2 = contract(y1,H[i], ar::zerotwo,ar::zerotwo);
+//               auto y3 = contract(y2,tU,   ar::zerotwo,ar::zeroone);
+//
+//               L1.push( tU );
+//               L2.push( x2 );
+//               L3.push( y3 );
+//
+//           }
+//       }
+//   }
 
 #endif
