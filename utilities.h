@@ -2,6 +2,16 @@
 #ifndef UTILITIES_H
 #define UTILITIES_H
 
+#include <sstream>
+#include <string>
+
+std::string intstr(int n)
+{
+    std::stringstream in;
+    in << n;
+    return in.str();
+}
+
 namespace ar {
     std::array<int,1> zero      = {0};
     std::array<int,1> one       = {1};

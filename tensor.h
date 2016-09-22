@@ -313,7 +313,7 @@ namespace mpo_heis {
 
     bool initialized_check_spin = false;
 
-    void initialize(){
+    void initialize(double a, double b, double c){
         //if (initialized_check_spin)
         //   break;
         X(0,0) =  0;        X(0,1) = 1;        X(1,0) = 1;         X(1,1) = 0;
@@ -322,55 +322,55 @@ namespace mpo_heis {
         I(0,0) =  1;        I(0,1) = 0;        I(1,0) = 0;         I(1,1) = 1;
         zero(0,0) = 0; zero(0,1) = 0; zero(1,0) = 0; zero(1,1) = 0;
 
-        set_mpo(0,0, startH, I);
-        set_mpo(0,1, startH, I);
-        set_mpo(0,2, startH, I);
-        set_mpo(0,3, startH, X);
-        set_mpo(0,4, startH, Y);
-        set_mpo(0,5, startH, Z);
-        set_mpo(0,6, startH, zero);
+        set_mpo(0,0, startH, zero);
+        set_mpo(0,1, startH, zero);
+        set_mpo(0,2, startH, zero);
+        set_mpo(0,3, startH, a*X);
+        set_mpo(0,4, startH, b*Y);
+        set_mpo(0,5, startH, c*Z);
+        set_mpo(0,6, startH, I);
 
         //block: top-left
         set_mpo(0,0, middleH, I);                  set_mpo(0,1, middleH, zero);               set_mpo(0,2, middleH, zero);  //
         set_mpo(1,0, middleH, zero);               set_mpo(1,1, middleH, I);                  set_mpo(1,2, middleH, zero);  // TOP ROW
         set_mpo(2,0, middleH, zero);               set_mpo(2,1, middleH, zero);               set_mpo(2,2, middleH, I);     //
             //block: top-middle                                                                                                 //
-            set_mpo(0,3, middleH, X);                  set_mpo(0,4, middleH, zero);               set_mpo(0,5, middleH, zero);  //
-            set_mpo(1,3, middleH, zero);               set_mpo(1,4, middleH, Y);                  set_mpo(1,5, middleH, zero);  // TOP ROW
-            set_mpo(2,3, middleH, zero);               set_mpo(2,4, middleH, zero);               set_mpo(2,5, middleH, Z);     //
-                //block: top-right                                                                                                  //
+            set_mpo(0,3, middleH, zero);               set_mpo(0,4, middleH, zero);               set_mpo(0,5, middleH, zero);  //
+            set_mpo(1,3, middleH, zero);               set_mpo(1,4, middleH, zero);               set_mpo(1,5, middleH, zero);  // TOP ROW
+            set_mpo(2,3, middleH, zero);               set_mpo(2,4, middleH, zero);               set_mpo(2,5, middleH, zero);  //
+                //block: top-right                                                                                              //
                 set_mpo(0,6, middleH, zero);
                 set_mpo(1,6, middleH, zero);
                 set_mpo(2,6, middleH, zero);
 
         //block: middle-left
-        set_mpo(3,0, middleH, I);                  set_mpo(3,1, middleH, zero);               set_mpo(3,2, middleH, zero);  //
-        set_mpo(4,0, middleH, zero);               set_mpo(4,1, middleH, I);                  set_mpo(4,2, middleH, zero);  // MIDDLE ROW
-        set_mpo(5,0, middleH, zero);               set_mpo(5,1, middleH, zero);               set_mpo(5,2, middleH, I);     //
+        set_mpo(3,0, middleH, X);                  set_mpo(3,1, middleH, zero);               set_mpo(3,2, middleH, zero);  //
+        set_mpo(4,0, middleH, zero);               set_mpo(4,1, middleH, Y);                  set_mpo(4,2, middleH, zero);  // MIDDLE ROW
+        set_mpo(5,0, middleH, zero);               set_mpo(5,1, middleH, zero);               set_mpo(5,2, middleH, Z);     //
             //block: middle-middle                                                                                              //
             set_mpo(3,3, middleH, zero);               set_mpo(3,4, middleH, zero);               set_mpo(3,5, middleH, zero);  //
             set_mpo(4,3, middleH, zero);               set_mpo(4,4, middleH, zero);               set_mpo(4,5, middleH, zero);  // MIDDLE ROW
             set_mpo(5,3, middleH, zero);               set_mpo(5,4, middleH, zero);               set_mpo(5,5, middleH, zero);  //
                 //block: middle-right                                                                                               //
-                set_mpo(3,6, middleH, X);
-                set_mpo(4,6, middleH, Y);
-                set_mpo(5,6, middleH, Z); // Delta * Z goes here!
+                set_mpo(3,6, middleH, zero);
+                set_mpo(4,6, middleH, zero);
+                set_mpo(5,6, middleH, zero); 
 
         //block: bottom-left
         set_mpo(6,0, middleH, zero);               set_mpo(6,1, middleH, zero);               set_mpo(6,2, middleH, zero);  // BOTTOM ROW
             //block: bottom-middle                                                                                              //
-            set_mpo(6,3, middleH, zero);               set_mpo(6,4, middleH, zero);               set_mpo(6,5, middleH, zero);  // BOTTOM ROW
+            set_mpo(6,3, middleH, a*X);               set_mpo(6,4, middleH, b*Y);               set_mpo(6,5, middleH, c*Z);  // BOTTOM ROW
                 //block: bottom-right                                                                                               //
                 set_mpo(6,6, middleH, I);
 
 
-        set_mpo(0,0, endH,zero);
-        set_mpo(1,0, endH,zero);
-        set_mpo(2,0, endH,zero);
+        set_mpo(0,0, endH,I);
+        set_mpo(1,0, endH,I);
+        set_mpo(2,0, endH,I);
         set_mpo(3,0, endH,X);
         set_mpo(4,0, endH,Y);
         set_mpo(5,0, endH,Z);
-        set_mpo(6,0, endH,I);
+        set_mpo(6,0, endH,zero);
     }
 
 };

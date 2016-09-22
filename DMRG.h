@@ -3,6 +3,7 @@
 #define DMRG_H
 
 #include <iostream>
+#include <fstream>
 #include <iomanip>
 #include <iterator>
 #include <Eigen/Dense>
@@ -58,11 +59,15 @@ class DMRG {
         void sweep(int);
 
         void output_eigenvalue_history();
-        void output_lowest_energy();
+        void output_lowest_energy(std::ofstream & );
+        void output_lowest_energy_cout();
+
 
         std::vector<tensor<cd,3> > final_mps_state();
 
         void output_current_norm();
+
+        //tensor<cd,N> contract_mps();
 };
 
 template<size_t N>
@@ -82,9 +87,16 @@ DMRG<N>::output_current_norm()
 
 template<size_t N>
 void
-DMRG<N>::output_lowest_energy()
+DMRG<N>::output_lowest_energy(std::ofstream & outfile)
 {
-    std::cout << "Chain length: " << N-2 << "; eigenvalue: " << *(eigenvalue_history.rbegin()) << std::endl;
+    outfile << "" << N-2 << " " << *(eigenvalue_history.rbegin()) << std::endl;
+}
+
+template<size_t N>
+void
+DMRG<N>::output_lowest_energy_cout()
+{
+    std::cout << "" << N-2 << " " << *(eigenvalue_history.rbegin()) << std::endl;
 }
 
 template<size_t N>
@@ -400,61 +412,41 @@ DMRG<N>::DMRG ( int D, double eps )
     }
 }
 
-//   template<size_t N>
-//   DMRG<N>::DMRG ( tensor<cd,N> psi, std::vector<tensor<cd,4> > H, double eps )
-//   {
-//       epsilon = eps;
-//       hamiltonian = H;
-//
-//       tensor<cd,2> f2(vi({1,1}));   f2(vi({0,0}))   = 1; L2.push(f2); R2.push(f2);  // initialize stacks
-//       tensor<cd,3> f3(vi({1,1,1})); f3(vi({0,0,0})) = 1; L3.push(f3); R3.push(f3);
-//
-//       Eigen::MatrixXcd tmp       = tensor_to_matrix(psi, ar::zeroone, array_range<2,N-1>());
-//       std::vector<int> tmp_shape = tensor_shape(psi);
-//
-//       int trim;
-//       for(int i = 0; i <= N-3; ++i){ 
-//           Eigen::MatrixXcd U;
-//           Eigen::MatrixXcd V;
-//           if (i < N-3) {
-//               std::tie (trim, U, V) = svd_then_trim(tmp, epsilon);
-//               auto tU = matrix_to_tensor(U, ar::zeroone, ar::two, triple(tmp_shape[0],tmp_shape[1],trim));
-//               auto x = L2.top();
-//               auto y = L3.top();
-//
-//               auto x1 = contract(x,tU,ar::zero,ar::zero,false,true);
-//               auto x2 = contract(x1,tU,ar::zeroone,ar::zeroone,false,false);
-//
-//               auto y1 = contract(y,tU,    ar::zero,   ar::zero,false,true); // conjugate P
-//               auto y2 = contract(y1,H[i], ar::zerotwo,ar::zerotwo);
-//               auto y3 = contract(y2,tU,   ar::zerotwo,ar::zeroone);
-//
-//               L1.push( tU );
-//               L2.push( x2 );
-//               L3.push( y3 );
-//
-//               tmp_shape.erase(tmp_shape.begin());          // 01234 -> 1234     A(01)(234) --> U(01)(s) V(s)(234)
-//               tmp_shape[0] = trim;                         // 1234  -> s234                --> U[01s]   V[s,2,3,4]
-//               tmp          = inplace_index_swap_of_underlying_tensor(V, tmp_shape); // (s,234) -> (s2,34)
-//
-//           } else {
-//               auto tU = matrix_to_tensor(tmp, ar::zeroone, ar::two, tmp_shape);
-//               auto x = L2.top();
-//               auto y = L3.top();
-//
-//               auto x1 = contract(x,tU,ar::zero,ar::zero,false,true);
-//               auto x2 = contract(x1,tU,ar::zeroone,ar::zeroone,false,false);
-//
-//               auto y1 = contract(y,tU,    ar::zero,   ar::zero,false,true); // conjugate P
-//               auto y2 = contract(y1,H[i], ar::zerotwo,ar::zerotwo);
-//               auto y3 = contract(y2,tU,   ar::zerotwo,ar::zeroone);
-//
-//               L1.push( tU );
-//               L2.push( x2 );
-//               L3.push( y3 );
-//
-//           }
-//       }
+/*
+template<size_t N>
+tensor<cd,N-2> contract_mps_recursive<N,N-3>( tensor<cd,N-3> old, std::vector<tensor<cd,3> > rest )
+{
+    assert(rest.size() == 1);
+    return contract(old, rest[0], ar::two, ar::zero);
+}
+
+template<size_t N, size_t M>
+tensor<cd,M+1> contract_mps_recursive( tensor<cd,M> old, std::vector<tensor<cd,3> > rest )
+{
+    assert(N-M+1 == rest.size());
+//   if (M+1 == N-2){ // redundant
+//       assert(rest.size() == 1);
+//       return contract(old, rest[0], ar::two, ar::zero);
 //   }
+//   else{ 
+        tensor<cd,3> tmp = rest[N-M];
+        rest.erase(rest.begin()+N-M);
+        return contract_mps_recursive<N,M+1>( contract(tmp, old, ar::two, ar::zero ), rest ); 
+//    }
+}
+
+
+template<size_t N>
+tensor<cd,N> 
+DMRG<N>::contract_mps()
+{
+    std::vector<tensor<cd,3> > rest = final_mps_state(); // size = N-2
+    tensor<cd,3> first = rest[N-3];
+    rest.erase(rest.begin()+N-3);
+    return contract_mps_recursive<N,3>( first, rest );
+}
+*/
+
+
 
 #endif
