@@ -58,8 +58,8 @@ class DMRG {
 
         void sweep(int);
 
-        void output_eigenvalue_history();
-        void output_lowest_energy(std::ofstream & );
+        void output_eigenvalue_history(std::ofstream &);
+        void output_lowest_energy(std::ofstream & , bool );
         void output_lowest_energy_cout();
 
 
@@ -87,9 +87,11 @@ DMRG<N>::output_current_norm()
 
 template<size_t N>
 void
-DMRG<N>::output_lowest_energy(std::ofstream & outfile)
+DMRG<N>::output_lowest_energy(std::ofstream & outfile, bool standard_output)
 {
-    outfile << "" << N-2 << " " << *(eigenvalue_history.rbegin()) << std::endl;
+    outfile << "" << N-2 << " " << std::fixed << std::setprecision(7) << *(eigenvalue_history.rbegin()) << std::endl;
+    if(standard_output)
+        std::cout << "" << N-2 << " " << std::fixed << std::setprecision(7) << *(eigenvalue_history.rbegin()) << std::endl;
 }
 
 template<size_t N>
@@ -101,15 +103,15 @@ DMRG<N>::output_lowest_energy_cout()
 
 template<size_t N>
 void
-DMRG<N>::output_eigenvalue_history()
+DMRG<N>::output_eigenvalue_history(std::ofstream & outfile)
 {
     std::vector<double> t2(eigenvalue_history.begin(),eigenvalue_history.end());
     std::unique(t2.begin(), t2.end());
 
-    std::cout << "The eigenvalue history is: " << std::endl;
+    outfile << "The eigenvalue history is: " << std::endl;
     for(int i = 0; i < t2.size(); ++i)
-        std::cout << std::setprecision(20) << t2[i] << std::endl;
-    std::cout << std::endl;
+        outfile << std::fixed << std::setprecision(10) << t2[i] << std::endl;
+    outfile << std::endl;
 }
 
 template<size_t N>
@@ -133,7 +135,6 @@ DMRG<N>::final_mps_state()
         }
         return x;
     }
-
 }
 
 template<size_t N>
@@ -142,7 +143,7 @@ DMRG<N>::eigen_solve (int pos)
 {
     tensor<cd,5> T1 = contract(L3.top(), hamiltonian[pos],   ar::one,  ar::zero); // (l0 l1 l2) (h0 h1 h2 h3)  ----->  (l0 l2 h1 h2 h3)
     tensor<cd,6> T2 = contract(T1,       R3.top(),           ar::four, ar::one);  // (l0 l2 h1 h2 h3) (r0 r1 r2) --->  (l0 l2 h1 h2 r0 r2)
-                                                                                                                     //  0  1  2  3  4  5 
+
     std::array<int,3> rows = {{ 0,3,4 }};
     std::array<int,3> cols = {{ 1,2,5 }};
 
@@ -267,7 +268,7 @@ void DMRG<N>::right_sweep_once()
     R1.pop();
     R2.pop();
     R3.pop();
-    
+
     //TODO:check that it's an eigenvalue problem => Psi_L and Psi_R
     Eigen::VectorXcd  vec;
     double            eigenval;

@@ -173,7 +173,7 @@ svd_then_trim (Eigen::MatrixXcd M, double epsilon)
 
 template<typename T,size_t N>
 std::vector<tensor<T,3> > 
-tensor_to_left_normalized_mps (tensor<T,N> A, double epsilon=1e-4)
+tensor_to_left_normalized_mps (tensor<T,N> A, double epsilon=1e-10)
 {
     std::vector<tensor<T,3> > mpsState;
     // A = A_(i0... i_{n+1})
@@ -300,9 +300,9 @@ void set_mpo(int r, int c, tensor<cd,4> &t, Eigen::MatrixXcd M)
 
 namespace mpo_heis {
     // pauli-matrices
-    Eigen::Matrix2cd X;
-    Eigen::Matrix2cd Y;
-    Eigen::Matrix2cd Z;
+    Eigen::Matrix2cd SX;
+    Eigen::Matrix2cd SY;
+    Eigen::Matrix2cd SZ;
     Eigen::Matrix2cd I;
     Eigen::Matrix2cd zero;
 
@@ -316,18 +316,18 @@ namespace mpo_heis {
     void initialize(double a, double b, double c){
         //if (initialized_check_spin)
         //   break;
-        X(0,0) =  0;        X(0,1) = 1;        X(1,0) = 1;         X(1,1) = 0;
-        Y(0,0) =  0;        Y(0,1) = cd(0,-1); Y(1,0) = cd(0,1);   Y(1,1) = -1;
-        Z(0,0) =  1;        Z(0,1) = 0;        Z(1,0) = 0;         Z(1,1) = -1;
-        I(0,0) =  1;        I(0,1) = 0;        I(1,0) = 0;         I(1,1) = 1;
-        zero(0,0) = 0; zero(0,1) = 0; zero(1,0) = 0; zero(1,1) = 0;
+        SX(0,0) =  0;        SX(0,1) = 0.5;        SX(1,0) = 0.5;         SX(1,1) = 0;
+        SY(0,0) =  0;        SY(0,1) = cd(0,-0.5); SY(1,0) = cd(0,0.5);   SY(1,1) = 0;
+        SZ(0,0) =  0.5;      SZ(0,1) = 0;          SZ(1,0) = 0;           SZ(1,1) = -0.5;
+        I(0,0) =  1;         I(0,1) = 0;           I(1,0) = 0;            I(1,1) = 1;
+        zero(0,0) = 0;       zero(0,1) = 0;        zero(1,0) = 0;         zero(1,1) = 0;
 
         set_mpo(0,0, startH, zero);
         set_mpo(0,1, startH, zero);
         set_mpo(0,2, startH, zero);
-        set_mpo(0,3, startH, a*X);
-        set_mpo(0,4, startH, b*Y);
-        set_mpo(0,5, startH, c*Z);
+        set_mpo(0,3, startH, a*SX);
+        set_mpo(0,4, startH, b*SY);
+        set_mpo(0,5, startH, c*SZ);
         set_mpo(0,6, startH, I);
 
         //block: top-left
@@ -344,9 +344,9 @@ namespace mpo_heis {
                 set_mpo(2,6, middleH, zero);
 
         //block: middle-left
-        set_mpo(3,0, middleH, X);                  set_mpo(3,1, middleH, zero);               set_mpo(3,2, middleH, zero);  //
-        set_mpo(4,0, middleH, zero);               set_mpo(4,1, middleH, Y);                  set_mpo(4,2, middleH, zero);  // MIDDLE ROW
-        set_mpo(5,0, middleH, zero);               set_mpo(5,1, middleH, zero);               set_mpo(5,2, middleH, Z);     //
+        set_mpo(3,0, middleH, SX);                  set_mpo(3,1, middleH, zero);               set_mpo(3,2, middleH, zero);  //
+        set_mpo(4,0, middleH, zero);                set_mpo(4,1, middleH, SY);                 set_mpo(4,2, middleH, zero);  // MIDDLE ROW
+        set_mpo(5,0, middleH, zero);                set_mpo(5,1, middleH, zero);               set_mpo(5,2, middleH, SZ);     //
             //block: middle-middle                                                                                              //
             set_mpo(3,3, middleH, zero);               set_mpo(3,4, middleH, zero);               set_mpo(3,5, middleH, zero);  //
             set_mpo(4,3, middleH, zero);               set_mpo(4,4, middleH, zero);               set_mpo(4,5, middleH, zero);  // MIDDLE ROW
@@ -359,7 +359,7 @@ namespace mpo_heis {
         //block: bottom-left
         set_mpo(6,0, middleH, zero);               set_mpo(6,1, middleH, zero);               set_mpo(6,2, middleH, zero);  // BOTTOM ROW
             //block: bottom-middle                                                                                              //
-            set_mpo(6,3, middleH, a*X);               set_mpo(6,4, middleH, b*Y);               set_mpo(6,5, middleH, c*Z);  // BOTTOM ROW
+            set_mpo(6,3, middleH, a*SX);               set_mpo(6,4, middleH, b*SY);               set_mpo(6,5, middleH, c*SZ);  // BOTTOM ROW
                 //block: bottom-right                                                                                               //
                 set_mpo(6,6, middleH, I);
 
@@ -367,9 +367,9 @@ namespace mpo_heis {
         set_mpo(0,0, endH,I);
         set_mpo(1,0, endH,I);
         set_mpo(2,0, endH,I);
-        set_mpo(3,0, endH,X);
-        set_mpo(4,0, endH,Y);
-        set_mpo(5,0, endH,Z);
+        set_mpo(3,0, endH,SX);
+        set_mpo(4,0, endH,SY);
+        set_mpo(5,0, endH,SZ);
         set_mpo(6,0, endH,zero);
     }
 
