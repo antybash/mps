@@ -12,6 +12,8 @@
 #include <stack>
 #include <set>
 
+#include <functional>
+
 #include "tensor.h"
 #include "utilities.h"
 
@@ -34,6 +36,7 @@ class DMRG {
         std::vector<tensor<cd,4> > hamiltonian;
 
         std::vector<double> eigenvalue_history;
+        std::vector<std::pair<int,double> > extended_eigenvalue_history;
 
         std::tuple<double, Eigen::VectorXcd, std::vector<int> > eigen_solve(int);
         tensor<cd,3> eigenvector_to_mps  (Eigen::VectorXcd, std::vector<int>);
@@ -46,6 +49,13 @@ class DMRG {
 
         void right_sweep_once(); // doing one update loses information (and hence this method is private)
         void left_sweep_once();  // must update the entire sequence, and keep solving eigensolving!
+
+        bool print_to_cout;
+        bool create_logs;
+        std::string logs_base;
+        std::string logs_eigenvalues;
+        std::ofstream outfile_eigenvalues;
+        void update_logs();
 
     public:
         //DMRG (tensor<cd,N>, std::vector<tensor<cd,4> >, double);                // (psi, mpo, cutoff)
@@ -60,15 +70,50 @@ class DMRG {
 
         void output_eigenvalue_history(std::ofstream &);
         void output_lowest_energy(std::ofstream & , bool );
-        void output_lowest_energy_cout();
-
 
         std::vector<tensor<cd,3> > final_mps_state();
 
         void output_current_norm();
+        void set_logs(bool,std::string);
 
         //tensor<cd,N> contract_mps();
 };
+
+template<size_t N>
+void
+DMRG<N>::set_logs(bool v, std::string filename)
+{
+    create_logs = true;
+    print_to_cout = v;
+
+    logs_base = filename;
+    logs_eigenvalues = filename + "_eigHistory";
+
+    outfile_eigenvalues.open(logs_eigenvalues);
+}
+
+template<size_t N>
+void
+DMRG<N>::update_logs()
+{
+    if(create_logs)
+        outfile_eigenvalues
+            << (*(extended_eigenvalue_history.rbegin())).first 
+            << " "
+            << std::fixed 
+            << std::setprecision(10) 
+            << (*(extended_eigenvalue_history.rbegin())).second 
+            << std::endl;
+
+    if(print_to_cout)
+        std::cout 
+            << (*(extended_eigenvalue_history.rbegin())).first 
+            << " "
+            << std::fixed 
+            << std::setprecision(10) 
+            << (*(extended_eigenvalue_history.rbegin())).second 
+            << std::endl;
+}
 
 template<size_t N>
 void
@@ -91,26 +136,22 @@ DMRG<N>::output_lowest_energy(std::ofstream & outfile, bool standard_output)
 {
     outfile << "" << N-2 << " " << std::fixed << std::setprecision(7) << *(eigenvalue_history.rbegin()) << std::endl;
     if(standard_output)
-        std::cout << "" << N-2 << " " << std::fixed << std::setprecision(7) << *(eigenvalue_history.rbegin()) << std::endl;
-}
-
-template<size_t N>
-void
-DMRG<N>::output_lowest_energy_cout()
-{
-    std::cout << "" << N-2 << " " << *(eigenvalue_history.rbegin()) << std::endl;
+        std::cout << " " << N-2 << " " << std::fixed << std::setprecision(7) << *(eigenvalue_history.rbegin()) << std::endl;
 }
 
 template<size_t N>
 void
 DMRG<N>::output_eigenvalue_history(std::ofstream & outfile)
 {
-    std::vector<double> t2(eigenvalue_history.begin(),eigenvalue_history.end());
-    std::unique(t2.begin(), t2.end());
-
     outfile << "The eigenvalue history is: " << std::endl;
-    for(int i = 0; i < t2.size(); ++i)
-        outfile << std::fixed << std::setprecision(10) << t2[i] << std::endl;
+    for(int i = 0; i < extended_eigenvalue_history.size(); ++i)
+        outfile << extended_eigenvalue_history[i].first 
+            << " "
+            << std::fixed 
+            << std::setprecision(10) 
+            << extended_eigenvalue_history[i].second 
+            << std::endl;
+
     outfile << std::endl;
 }
 
@@ -276,6 +317,7 @@ void DMRG<N>::right_sweep_once()
 
     std::tie(eigenval,vec,new_shape) = eigen_solve(k);
     eigenvalue_history.push_back(eigenval);
+    extended_eigenvalue_history.push_back(std::pair<int,double>(k,eigenval));
 
     tensor<cd,3> eigentensor_not_normalized = eigenvector_to_mps( vec, new_shape );
     tensor<cd,3> eigentensor_normalized     = left_normalize_mps(eigentensor_not_normalized);
@@ -290,6 +332,7 @@ void DMRG<N>::right_sweep()
 {
     for(int i = 0; i < N-2; ++i){
         right_sweep_once();
+        update_logs();
     }
 }
 
@@ -307,6 +350,7 @@ void DMRG<N>::left_sweep_once()
     std::vector<int> new_shape;
     std::tie(eigenval,vec,new_shape) = eigen_solve(k);
     eigenvalue_history.push_back(eigenval);
+    extended_eigenvalue_history.push_back(std::pair<int,double>(k,eigenval));
 
     tensor<cd,3> eigentensor_not_normalized = eigenvector_to_mps ( vec, new_shape );
     tensor<cd,3> eigentensor_normalized     = right_normalize_mps(eigentensor_not_normalized);
@@ -321,6 +365,7 @@ void DMRG<N>::left_sweep()
 {
     for(int i = 0; i < N-2; ++i){
         left_sweep_once();
+        update_logs();
     }
 }
 
@@ -420,7 +465,6 @@ tensor<cd,N-2> contract_mps_recursive<N,N-3>( tensor<cd,N-3> old, std::vector<te
     assert(rest.size() == 1);
     return contract(old, rest[0], ar::two, ar::zero);
 }
-
 template<size_t N, size_t M>
 tensor<cd,M+1> contract_mps_recursive( tensor<cd,M> old, std::vector<tensor<cd,3> > rest )
 {
@@ -435,8 +479,6 @@ tensor<cd,M+1> contract_mps_recursive( tensor<cd,M> old, std::vector<tensor<cd,3
         return contract_mps_recursive<N,M+1>( contract(tmp, old, ar::two, ar::zero ), rest ); 
 //    }
 }
-
-
 template<size_t N>
 tensor<cd,N> 
 DMRG<N>::contract_mps()
@@ -447,7 +489,3 @@ DMRG<N>::contract_mps()
     return contract_mps_recursive<N,3>( first, rest );
 }
 */
-
-
-
-#endif
